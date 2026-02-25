@@ -4,10 +4,11 @@
 
 module SerraLINE {
   use Parms;
-  use Math;
-  use LinearAlgebra;
   use CustomIO;
   use Functions;
+  use Extract;
+  use Math;
+  use LinearAlgebra;
   use IO;
 
   config const top: string = "";

@@ -1,0 +1,11 @@
+[brick]
+chplVersion = "2.7.0"
+license = "None"
+name = "SerraLINE"
+type = "application"
+version = "0.1.0"
+
+[dependencies]
+
+[system]
+cblas = "3.12.0"

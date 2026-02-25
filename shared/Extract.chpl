@@ -8,6 +8,7 @@ module Extract {
   use Functions;
   use CustomIO;
   use List;
+  use IO;
 
   /*
    * Extracts data for a sublength or subfragment from a parameter file.

@@ -2,3 +2,4 @@ target/
 Mason.lock
 doc/
 sources/
+.vscode/
