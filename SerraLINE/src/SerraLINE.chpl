@@ -6,7 +6,6 @@ module SerraLINE {
   use Parms;
   use CustomIO;
   use Functions;
-  use Extract;
   use Math;
   use LinearAlgebra;
   use IO;

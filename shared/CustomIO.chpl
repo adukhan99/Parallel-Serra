@@ -382,17 +382,16 @@ module CustomIO {
       for i in 1..2 do for j in 1..7 do reader.read(ovBsp[i, j, 1]);
       
       f.close();
-      return (1, nbp, frames, strands, str, nBsp, seqI, seqII, BSP, ovBsp, 
+      return (1:int, nbp, frames, strands, str, nBsp, seqI, seqII, BSP, ovBsp, 
               matrix(0, 0), array3D(0, 0, 0), // elasp
-              array3D(0, 0, 0), matrix(0, 0), // strucp, avstrp
-              array3D(0, 0, 0), array3D(0, 0, 0), // OV
+              array3D(0, 0, 0), matrix(0, 0), array3D(0, 0, 0), array3D(0, 0, 0), // strucp, avstrp, ovStrucp, ovAvstrp
               array3D(0, 0, 0), matrix(0, 0)); // BPP
     }
   }
 
   // Define placeholders for empty arrays to keep tuple size consistent
-    private proc matrix(d1, d2) { var A: [1..d1, 1..d2] real; return A; }
-    private proc array3D(d1, d2, d3) { 
+    private proc matrix(d1: int, d2: int) { var A: [1..d1, 1..d2] real; return A; }
+    private proc array3D(d1: int, d2: int, d3: int) { 
       var A: [1..d1, 1..d2, 1..d3] real;
       return A;
     }
@@ -433,11 +432,10 @@ module CustomIO {
       }
       
       f.close();
-      return (2, nbp, frames, strands, str, nBsp, seqI, seqII, 
+      return (2:int, nbp, frames, strands, str, nBsp, seqI, seqII, 
               array3D(0, 0, 0), array3D(0, 0, 0), // BSP
               elasp, ovElasp, 
-              array3D(0, 0, 0), matrix(0, 0), // strucp, avstrp
-              array3D(0, 0, 0), array3D(0, 0, 0), // OV
+              array3D(0, 0, 0), matrix(0, 0), array3D(0, 0, 0), array3D(0, 0, 0), // strucp, avstrp, ovStrucp, ovAvstrp
               array3D(0, 0, 0), matrix(0, 0)); // BPP
     }
   }
@@ -483,11 +481,10 @@ module CustomIO {
       }
       
       f.close();
-      return (3, nbp, frames, strands, str, nBsp, seqI, seqII, 
+      return (3:int, nbp, frames, strands, str, nBsp, seqI, seqII, 
               array3D(0, 0, 0), array3D(0, 0, 0), // BSP
               matrix(0, 0), array3D(0, 0, 0), // elasp
               strucp, avstrp, ovStrucp, ovAvstrp,
-              array3D(0, 0, 0), array3D(0, 0, 0), // OV
               array3D(0, 0, 0), matrix(0, 0)); // BPP
     }
   }
@@ -521,11 +518,10 @@ module CustomIO {
       for k in 1..2 do for l in 1..6 do reader.read(ovBpp[k, l]);
       
       f.close();
-      return (4, nbp, frames, strands, str, nBsp, seqI, seqII, 
+      return (4:int, nbp, frames, strands, str, nBsp, seqI, seqII, 
               array3D(0, 0, 0), array3D(0, 0, 0), // BSP
               matrix(0, 0), array3D(0, 0, 0), // elasp
-              array3D(0, 0, 0), matrix(0, 0), // strucp, avstrp
-              array3D(0, 0, 0), array3D(0, 0, 0), // OV
+              array3D(0, 0, 0), matrix(0, 0), array3D(0, 0, 0), array3D(0, 0, 0), // strucp, avstrp, ovStrucp, ovAvstrp
               BPP, ovBpp);
     }
   }
