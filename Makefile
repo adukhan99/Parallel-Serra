@@ -1,9 +1,9 @@
 # Serra Build Makefile
 CHPL_FLAGS = -M ../shared
 
-.PHONY: all SerraNA SerraLINE Extract Analysis clean
+.PHONY: all SerraNA SerraLINE Extract Analysis WrLINE clean
 
-all: SerraNA SerraLINE Extract Analysis
+all: SerraNA SerraLINE Extract Analysis WrLINE
 
 SerraNA:
 	cd SerraNA && mason build -- $(CHPL_FLAGS)
@@ -17,8 +17,12 @@ Extract:
 Analysis:
 	cd Analysis && mason build -- $(CHPL_FLAGS)
 
+WrLINE:
+	cd WrLINE && mason build -- $(CHPL_FLAGS)
+
 clean:
 	cd SerraNA && mason clean
 	cd SerraLINE && mason clean
 	cd Extract && mason clean
 	cd Analysis && mason clean
+	cd WrLINE && mason clean
