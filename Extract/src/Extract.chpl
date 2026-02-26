@@ -9,20 +9,71 @@ module Extract {
   use CustomIO;
   use List;
   use IO;
+  use Map;
 
-  config const fileIn: string = "";
-  config const typeExt: int = 0;
-  config const sublength: int = -1;
-  config const a: int = 0;
-  config const b: int = 0;
+  config var configFile: string = "";
+  config var fileIn: string = "";
+  config var typeExt: int = 0;
+  config var sublength: int = -1;
+  config var a: int = 0;
+  config var b: int = 0;
+
+  /*
+   * Parse a simple key = value config file.
+   * Lines beginning with 'c' or '#' are treated as comments.
+   * Returns a map of key -> value strings.
+   */
+  proc parseConfigFile(path: string) {
+    var cfg: map(string, string);
+    try! {
+      var f = open(path, ioMode.r);
+      var reader = f.reader();
+      var line: string;
+      while reader.readLine(line) {
+        line = line.strip();
+        if line == "" then continue;
+        if line[0] == "c" || line[0] == "#" then continue;
+        var eqIdx = line.find("="):int;
+        if eqIdx == -1 then continue;
+        var k = line[0..eqIdx-1].strip();
+        var v = line[eqIdx+1..].strip();
+        cfg.add(k, v);
+      }
+      f.close();
+    }
+    return cfg;
+  }
 
   proc main() {
-    if fileIn == "" {
-      writeln("Error: fileIn must be provided (e.g. --fileIn=...)");
+    // Load config file values as defaults (CLI flags override them).
+    var cfgFileIn = fileIn;
+    var cfgTypeExt = typeExt;
+    var cfgSublength = sublength;
+    var cfgA = a;
+    var cfgB = b;
+
+    if configFile != "" {
+      var cfg = parseConfigFile(configFile);
+      if fileIn == "" && cfg.contains("fileIn") then
+        cfgFileIn = try! cfg["fileIn"];
+      if typeExt == 0 && cfg.contains("typeExt") then
+        cfgTypeExt = try! cfg["typeExt"]:int;
+      if sublength == -1 && cfg.contains("sublength") then
+        cfgSublength = try! cfg["sublength"]:int;
+      if a == 0 && cfg.contains("a") then
+        cfgA = try! cfg["a"]:int;
+      if b == 0 && cfg.contains("b") then
+        cfgB = try! cfg["b"]:int;
+    }
+
+    if cfgFileIn == "" {
+      writeln(
+        "Error: fileIn must be provided (e.g. --fileIn=...) or via " +
+        "--configFile=<file>");
       return;
     }
-    var s_len = if sublength >= 0 then sublength else 0;
-    extractParameters(fileIn, typeExt, s_len, a, b);
+    var s_len = if cfgSublength >= 0 then cfgSublength else 0;
+    extractParameters(cfgFileIn, cfgTypeExt, s_len, cfgA, cfgB);
   }
 
   /*
@@ -77,7 +128,7 @@ module Extract {
                                   else if str == 2 then (if a < b then b-a else nbp-a+b)
                                   else b-a;          var subovElaspMean: [1..13, 1..overallSize] real;
           var subovElaspStd: [1..13, 1..overallSize] real;
-          for i in 1..13 {
+          forall i in 1..13 {
             var (m, s) = centralFragmentMeanStd(elasp[i, ..], a, b, nbp, str);
             subovElaspMean[i, ..] = m;
             subovElaspStd[i, ..] = s;
@@ -90,14 +141,14 @@ module Extract {
                                   else if str == 2 then (if a < b then b-a else nbp-a+b)
                                   else b-a;          var subovStrucpMean: [1..2, 1..11, 1..overallSize] real;
           var subovStrucpStd: [1..2, 1..11, 1..overallSize] real;
-          for i in 1..2 do for j in 1..11 {
+          forall (i, j) in {1..2, 1..11} {
             var (m, s) = centralFragmentMeanStd(strucp[i, j, ..], a, b, nbp, str);
             subovStrucpMean[i, j, ..] = m;
             subovStrucpStd[i, j, ..] = s;
           }
           var subovAvstrpMean: [1..3, 1..overallSize] real;
           var subovAvstrpStd: [1..3, 1..overallSize] real;
-          for i in 1..3 {
+          forall i in 1..3 {
             var (m, s) = centralFragmentMeanStd(avstrp[i, ..], a, b, nbp, str);
             subovAvstrpMean[i, ..] = m;
             subovAvstrpStd[i, ..] = s;
@@ -150,7 +201,7 @@ module Extract {
   }
 
   // Helper functions for writing extracted data
-  proc writeExtracted2D(mid: [] real, data: [] real,
+  proc writeExtracted2D(ref mid: [] real, ref data: [] real,
                       filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
@@ -167,7 +218,7 @@ module Extract {
     }
   }
 
-  proc writeExtracted3D2D(mid: [] real, data1: [] real, data2: [] real,
+  proc writeExtracted3D2D(ref mid: [] real, ref data1: [] real, ref data2: [] real,
                         filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
@@ -189,7 +240,7 @@ module Extract {
     }
   }
 
-  proc writeExtractedBPP(data: [] real, filename: string) {
+  proc writeExtractedBPP(ref data: [] real, filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
       var writer = f.writer();
@@ -208,7 +259,7 @@ module Extract {
     }
   }
 
-  proc writeOveralls2D(mean: [] real, std: [] real,
+  proc writeOveralls2D(ref mean: [] real, ref std: [] real,
                      filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
@@ -231,8 +282,8 @@ module Extract {
     }
   }
 
-  proc writeOveralls3D2D(m1: [] real, s1: [] real, m2: [] real,
-                       s2: [] real, filename: string) {
+  proc writeOveralls3D2D(ref m1: [] real, ref s1: [] real, ref m2: [] real,
+                       ref s2: [] real, filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
       var writer = f.writer();

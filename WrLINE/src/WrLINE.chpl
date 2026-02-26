@@ -12,187 +12,154 @@ module WrLINE {
   use Parms;
   use Functions;
   use Math;
-  use LinearAlgebra;
   use IO;
   use FileSystem;
 
-  config const name: string = "";
-  config const top: string = "";
-  config const traj: string = "";
-  config const nbp: int = 0;
-  config const nstep: int = 0;
-  config const doStrip: bool = false;
+  config var name: string = "";
+  config var top: string = "";
+  config var traj: string = "";
+  config var nbp: int = 0;
+  config var nstep: int = 0;
+  config var doStrip: bool = false;
 
   // -----------------------------------------------------------------------
-  // MATHEMATICAL AND VECTOR OPERATIONS (from caxislib.py)
+  // TUPLE-BASED VECTOR MATH (stack-allocated, no heap overhead)
+  // -----------------------------------------------------------------------
+
+  type vec3 = 3*real;      // (real, real, real) — stack-allocated
+  type mat3 = 3*(3*real);  // 3 row-vectors — stack-allocated
+
+  inline proc mkVec(x: real, y: real, z: real): vec3 {
+    return (x, y, z);
+  }
+
+  inline proc vecAdd(a: vec3, b: vec3): vec3 {
+    return (a(0) + b(0), a(1) + b(1), a(2) + b(2));
+  }
+
+  inline proc vecSub(a: vec3, b: vec3): vec3 {
+    return (a(0) - b(0), a(1) - b(1), a(2) - b(2));
+  }
+
+  inline proc vecScale(a: vec3, s: real): vec3 {
+    return (a(0) * s, a(1) * s, a(2) * s);
+  }
+
+  inline proc vecDot(a: vec3, b: vec3): real {
+    return a(0) * b(0) + a(1) * b(1) + a(2) * b(2);
+  }
+
+  inline proc vecNorm(a: vec3): real {
+    return sqrt(a(0)**2 + a(1)**2 + a(2)**2);
+  }
+
+  inline proc vecNormalize(a: vec3): vec3 {
+    var n = vecNorm(a);
+    return (a(0) / n, a(1) / n, a(2) / n);
+  }
+
+  inline proc vecCross(a: vec3, b: vec3): vec3 {
+    return (a(1) * b(2) - a(2) * b(1),
+            a(2) * b(0) - a(0) * b(2),
+            a(0) * b(1) - a(1) * b(0));
+  }
+
+  // Matrix-vector multiply: M * v
+  inline proc matVec(m: mat3, v: vec3): vec3 {
+    return (vecDot(m(0), v),
+            vecDot(m(1), v),
+            vecDot(m(2), v));
+  }
+
+  // Matrix-matrix multiply: A * B
+  inline proc matMul(a: mat3, b: mat3): mat3 {
+    // Columns of B
+    var b0 = mkVec(b(0)(0), b(1)(0), b(2)(0));
+    var b1 = mkVec(b(0)(1), b(1)(1), b(2)(1));
+    var b2 = mkVec(b(0)(2), b(1)(2), b(2)(2));
+    return ((vecDot(a(0), b0), vecDot(a(0), b1), vecDot(a(0), b2)),
+            (vecDot(a(1), b0), vecDot(a(1), b1), vecDot(a(1), b2)),
+            (vecDot(a(2), b0), vecDot(a(2), b1), vecDot(a(2), b2)));
+  }
+
+  // -----------------------------------------------------------------------
+  // MATHEMATICAL OPERATIONS (from caxislib.py) — using tuples
   // -----------------------------------------------------------------------
 
   /*
-   * Find arctan of y/x and return values between -pi and pi
-   * (equivalent to atan2, but matching the Python source explicitly).
+   * Find arctan of y/x and return values between -pi and pi.
    */
-  proc arctan360(x: real, y: real): real {
-    var A: real;
+  inline proc arctan360(x: real, y: real): real {
     if x >= 0.0 && y >= 0.0 {
-      A = atan(y / x);        // Q1
+      return atan(y / x);        // Q1
     } else if x < 0.0 && y >= 0.0 {
-      A = atan(y / x) + pi;   // Q2
-    } else if x < 0.0 && y < 0.0 {
-      A = atan(y / x) - pi;   // Q3
+      return atan(y / x) + pi;   // Q2
+    } else 
+    if x < 0.0 && y < 0.0 {
+      return atan(y / x) - pi;   // Q3
     } else {
-      A = atan(y / x);        // Q4
+      return atan(y / x);        // Q4
     }
-    return A;
   }
 
   /*
    * Return the rotation matrix that rotates vector V to the z axis.
    */
-  proc setZ(Vin: [1..3] real): [1..3, 1..3] real {
-    var V = Vin / norm(Vin);
-    var x = V[1];
-    var y = V[2];
-    var z = V[3];
+  inline proc setZ(vin: vec3): mat3 {
+    var v = vecNormalize(vin);
+    var x = v(0), y = v(1), z = v(2);
 
     var A = arctan360(z, y);
     var B = atan(-x / sqrt(y**2 + z**2));
 
-    var Rx: [1..3, 1..3] real;
-    Rx[1, 1] = 1.0;
-    Rx[1, 2] = 0.0;
-    Rx[1, 3] = 0.0;
-    Rx[2, 1] = 0.0;
-    Rx[2, 2] = cos(A);
-    Rx[2, 3] = -sin(A);
-    Rx[3, 1] = 0.0;
-    Rx[3, 2] = sin(A);
-    Rx[3, 3] = cos(A);
+    var cosA = cos(A), sinA = sin(A);
+    var cosB = cos(B), sinB = sin(B);
 
-    var Ry: [1..3, 1..3] real;
-    Ry[1, 1] = cos(B);
-    Ry[1, 2] = 0.0;
-    Ry[1, 3] = sin(B);
-    Ry[2, 1] = 0.0;
-    Ry[2, 2] = 1.0;
-    Ry[2, 3] = 0.0;
-    Ry[3, 1] = -sin(B);
-    Ry[3, 2] = 0.0;
-    Ry[3, 3] = cos(B);
-
-    var Rxy: [1..3, 1..3] real = dot(Ry, Rx);
-    return Rxy;
+    var Rx: mat3 = ((1.0, 0.0, 0.0),
+                    (0.0, cosA, -sinA),
+                    (0.0, sinA, cosA));
+    var Ry: mat3 = ((cosB, 0.0, sinB),
+                    (0.0, 1.0, 0.0),
+                    (-sinB, 0.0, cosB));
+    return matMul(Ry, Rx);
   }
 
   /*
    * Return the rotation matrix about z that puts V on the x axis.
    */
-  proc setX(Vin: [1..3] real): [1..3, 1..3] real {
-    var V = Vin / norm(Vin);
-    var x = V[1];
-    var y = V[2];
-
+  inline proc setX(vin: vec3): mat3 {
+    var v = vecNormalize(vin);
+    var x = v(0), y = v(1);
     var C = -arctan360(x, y);
+    var cosC = cos(C), sinC = sin(C);
 
-    var Rz: [1..3, 1..3] real;
-    Rz[1, 1] = cos(C);
-    Rz[1, 2] = -sin(C);
-    Rz[1, 3] = 0.0;
-    Rz[2, 1] = sin(C);
-    Rz[2, 2] = cos(C);
-    Rz[2, 3] = 0.0;
-    Rz[3, 1] = 0.0;
-    Rz[3, 2] = 0.0;
-    Rz[3, 3] = 1.0;
-
-    return Rz;
+    return ((cosC, -sinC, 0.0),
+            (sinC, cosC, 0.0),
+            (0.0, 0.0, 1.0));
   }
 
   /*
    * Calculate twist angle between two base pairs.
-   *  Z is the vector defining the local Z axis.
-   *  P11-P12 are a base pair on strand A/B at step j,
-   *  P21-P22 are a base pair on strand A/B at step j+1.
    */
-  proc twistAngle(P11: [1..3] real, P12: [1..3] real,
-                  P21: [1..3] real, P22: [1..3] real,
-                  Zin: [1..3] real): real {
-    var r1 = P12 - P11;
-    var r2 = P22 - P21;
-    r1 /= norm(r1);
-    r2 /= norm(r2);
-    var Z = Zin / norm(Zin);
+  inline proc twistAngle(P11: vec3, P12: vec3,
+                         P21: vec3, P22: vec3,
+                         Zin: vec3): real {
+    var r1 = vecNormalize(vecSub(P12, P11));
+    var r2 = vecNormalize(vecSub(P22, P21));
+    var Z = vecNormalize(Zin);
 
-    // Rotate Z to align with z axis
     var Rxy = setZ(Z);
-    var r1r: [1..3] real = dot(Rxy, r1);
-    var r2r: [1..3] real = dot(Rxy, r2);
+    var r1r = matVec(Rxy, r1);
+    var r2r = matVec(Rxy, r2);
 
-    // Rotate r1 about z so its y-component becomes 0, rotate r2 along
     var Rz = setX(r1r);
-    var r2rr: [1..3] real = dot(Rz, r2r);
+    var r2rr = matVec(Rz, r2r);
 
-    return arctan360(r2rr[1], r2rr[2]) * 180.0 / pi;
-  }
-
-  /*
-   * Element-wise cross product for 3-component column arrays
-   * indexed [component] with values for a single vector.
-   */
-  proc crossVec(A: [1..3] real, B: [1..3] real): [1..3] real {
-    var C: [1..3] real;
-    C[1] = A[2] * B[3] - A[3] * B[2];
-    C[2] = A[3] * B[1] - A[1] * B[3];
-    C[3] = A[1] * B[2] - A[2] * B[1];
-    return C;
-  }
-
-  /*
-   * Element-wise cross product for arrays indexed [component, timestep].
-   * Returns an array of the same shape.
-   */
-  proc crossTS(A: [?D] real, B: [D] real): [D] real
-    where D.rank == 2 {
-    var nsteps = D.dim(1).size;
-    var C: [D] real;
-    for t in 1..nsteps {
-      C[1, t] = A[2, t] * B[3, t] - A[3, t] * B[2, t];
-      C[2, t] = A[3, t] * B[1, t] - A[1, t] * B[3, t];
-      C[3, t] = A[1, t] * B[2, t] - A[2, t] * B[1, t];
-    }
-    return C;
-  }
-
-  /*
-   * Element-wise dot product for arrays indexed [component, timestep].
-   * Returns a 1D array indexed [timestep].
-   */
-  proc dotTS(A: [?D] real, B: [D] real): [D.dim(1)] real
-    where D.rank == 2 {
-    var nsteps = D.dim(1).size;
-    var result: [D.dim(1)] real;
-    for t in 1..nsteps {
-      result[t] = A[1, t] * B[1, t] + A[2, t] * B[2, t]
-                  + A[3, t] * B[3, t];
-    }
-    return result;
-  }
-
-  /*
-   * Element-wise magnitude for arrays indexed [component, timestep].
-   * Returns a 1D array indexed [timestep].
-   */
-  proc sizeTS(A: [?D] real): [D.dim(1)] real
-    where D.rank == 2 {
-    var nsteps = D.dim(1).size;
-    var s: [D.dim(1)] real;
-    for t in 1..nsteps {
-      s[t] = sqrt(A[1, t]**2 + A[2, t]**2 + A[3, t]**2);
-    }
-    return s;
+    return arctan360(r2rr(0), r2rr(1)) * 180.0 / pi;
   }
 
   // -----------------------------------------------------------------------
-  // I/O OPERATIONS (from caxislib.py)
+  // I/O OPERATIONS
   // -----------------------------------------------------------------------
 
   /*
@@ -214,74 +181,55 @@ module WrLINE {
       var headerLine: string;
       reader.readLine(headerLine);
 
+      // Total coordinates: nstep * nbp * 2 atoms * 3 components
+      var totalCoords = inNstep * inNbp * 2 * 3;
+      var coords: [0..#totalCoords] real;
+      var idx = 0;
+
       // Read all coordinate values (8 characters wide, fixed format)
-      use List;
-      var coordList: list(real);
       var line: string;
       while reader.readLine(line) {
         var l = line.size;
-        // Strip trailing newline
         if l > 0 && line[l - 1] == "\n" then l -= 1;
         var n = l / 8;
         for i in 0..#n {
-          var token = line[i * 8..#8];
-          coordList.pushBack(token: real);
+          if idx < totalCoords {
+            var token = line[i * 8..#8];
+            coords[idx] = token: real;
+            idx += 1;
+          }
         }
       }
       f.close();
 
-      var la = coordList.size;
-      var nCoords = la / 3; // total (x,y,z) triplets
-
-      // Reshape into [nCoords, 3] then split by timestep
-      // Python: a = reshape(a, (la/3, 3))
-      //         x = reshape(a[:,0], (nstep, nbp*2))
-      //         y = reshape(a[:,1], (nstep, nbp*2))
-      //         z = reshape(a[:,2], (nstep, nbp*2))
-      var x: [1..inNstep, 1..inNbp * 2] real;
-      var y: [1..inNstep, 1..inNbp * 2] real;
-      var z: [1..inNstep, 1..inNbp * 2] real;
-      var idx = 0;
-      for coord in 0..#nCoords {
-        var cx = coordList[idx]; idx += 1;
-        var cy = coordList[idx]; idx += 1;
-        var cz = coordList[idx]; idx += 1;
-        // coord maps to (timestep, atom) in row-major
-        var t = coord / (inNbp * 2) + 1;
-        var a = coord % (inNbp * 2) + 1;
-        x[t, a] = cx;
-        y[t, a] = cy;
-        z[t, a] = cz;
-      }
-
-      // Build strand arrays
-      // Python (0-indexed): rA = [x[:,0:nbp:1], y[:,0:nbp:1], z[:,0:nbp:1]]
-      //   => columns 0..nbp-1 => Chapel 1..nbp
-      // Python (0-indexed): rB = [x[:,2*nbp-1:nbp-1:-1], ...]
-      //   => columns (2*nbp-1) down to nbp => Chapel (2*nbp) down to (nbp+1)
+      // Build strand arrays directly from flat coords
       var rA: [1..3, 1..inNstep, 1..inNbp] real;
       var rB: [1..3, 1..inNstep, 1..inNbp] real;
+
+      // coords layout: for each atom (nstep * nbp*2 atoms), 3 values
+      // atom order per timestep: atom 0..2*nbp-1
+      var atomsPerStep = inNbp * 2;
       for t in 1..inNstep {
         for j in 1..inNbp {
-          rA[1, t, j] = x[t, j];
-          rA[2, t, j] = y[t, j];
-          rA[3, t, j] = z[t, j];
-          // reversed second strand:
-          // Python idx (0-based): 2*nbp-1-k for k=0..nbp-1
-          // Chapel idx (1-based): 2*nbp - (j-1) = 2*nbp - j + 1
-          var revIdx = 2 * inNbp - j + 1;
-          rB[1, t, j] = x[t, revIdx];
-          rB[2, t, j] = y[t, revIdx];
-          rB[3, t, j] = z[t, revIdx];
+          // Strand A: atoms 0..nbp-1 (0-based) → j-1 (0-based)
+          var aIdx = ((t - 1) * atomsPerStep + (j - 1)) * 3;
+          rA[1, t, j] = coords[aIdx];
+          rA[2, t, j] = coords[aIdx + 1];
+          rA[3, t, j] = coords[aIdx + 2];
+
+          // Strand B: atoms reversed, Python: 2*nbp-1-k for k=0..nbp-1
+          var bAtom = 2 * inNbp - j; // 0-based atom index
+          var bIdx = ((t - 1) * atomsPerStep + bAtom) * 3;
+          rB[1, t, j] = coords[bIdx];
+          rB[2, t, j] = coords[bIdx + 1];
+          rB[3, t, j] = coords[bIdx + 2];
         }
       }
 
       // r = midpoints of neighboring bp steps (circular)
-      // Python: r[:,:,j] = 0.25*(rA[:,:,j]+rA[:,:,(j+1)%nbp]
-      //                          +rB[:,:,j]+rB[:,:,(j+1)%nbp])
       var r: [1..3, 1..inNstep, 1..inNbp] real;
       for j in 1..inNbp {
-        var jNext = (j % inNbp) + 1; // (j+1)%nbp => 1-based circular
+        var jNext = (j % inNbp) + 1;
         for t in 1..inNstep {
           for c in 1..3 {
             r[c, t, j] = 0.25 * (rA[c, t, j] + rA[c, t, jNext]
@@ -295,35 +243,29 @@ module WrLINE {
   }
 
   // -----------------------------------------------------------------------
-  // MAIN DATA PROCESSING (from caxislib.py)
+  // MAIN DATA PROCESSING — parallelized over base pairs
   // -----------------------------------------------------------------------
 
   /*
-   * 1st-order helical axis: average position of 2x5 neighbours of
-   * C1'-midpoints. Used for twist calculation.
+   * 1st-order helical axis: average position of 2×5 neighbours of
+   * C1'-midpoints. Parallelized over base pairs.
    */
   proc haxis(inNbp: int, inNstep: int,
-             r: [1..3, 1..inNstep, 1..inNbp] real) {
+             ref r: [1..3, 1..inNstep, 1..inNbp] real) {
     var rC: [1..3, 1..inNstep, 1..inNbp] real;
-    for j in 1..inNbp {
-      if j % 100 == 0 then
-        writeln("now working on basepairs ", j, "s...");
+    forall j in 1..inNbp {
       for t in 1..inNstep {
-        var sumVal: [1..3] real;
-        for c in 1..3 do sumVal[c] = r[c, t, j];
-        var k = 0;
-        while k < 5 {
-          k += 1;
-          // Circular indexing: (j-k)%nbp and (j+k)%nbp
+        var sx = r[1, t, j], sy = r[2, t, j], sz = r[3, t, j];
+        for k in 1..5 {
           var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
           var jp = ((j - 1 + k) % inNbp) + 1;
-          for c in 1..3 {
-            sumVal[c] += r[c, t, jm] + r[c, t, jp];
-          }
+          sx += r[1, t, jm] + r[1, t, jp];
+          sy += r[2, t, jm] + r[2, t, jp];
+          sz += r[3, t, jm] + r[3, t, jp];
         }
-        for c in 1..3 {
-          rC[c, t, j] = sumVal[c] / (2.0 * k + 1.0);
-        }
+        rC[1, t, j] = sx / 11.0;
+        rC[2, t, j] = sy / 11.0;
+        rC[3, t, j] = sz / 11.0;
       }
     }
     return rC;
@@ -331,30 +273,32 @@ module WrLINE {
 
   /*
    * Calculate twist from the C1' coordinates rA, rB and the
-   * 1st-order helical axis rC. Saves tw.ser file.
+   * 1st-order helical axis rC. Parallelized over base pairs.
+   * Saves tw.ser file.
    */
   proc calcTwist(inName: string, inNbp: int, inNstep: int,
-                 rA: [1..3, 1..inNstep, 1..inNbp] real,
-                 rB: [1..3, 1..inNstep, 1..inNbp] real,
-                 rC: [1..3, 1..inNstep, 1..inNbp] real) {
+                 ref rA: [1..3, 1..inNstep, 1..inNbp] real,
+                 ref rB: [1..3, 1..inNstep, 1..inNbp] real,
+                 ref rC: [1..3, 1..inNstep, 1..inNbp] real) {
     var tw: [1..inNstep, 1..inNbp] real;
-    for j in 1..inNbp {
-      if j % 100 == 0 then
-        writeln("now working on basepairs ", j, "s...");
+    forall j in 1..inNbp {
       for t in 1..inNstep {
         var jNext = (j % inNbp) + 1;
         var jPrev = ((j - 2 + inNbp) % inNbp) + 1;
-        var Z: [1..3] real;
-        for c in 1..3 do Z[c] = rC[c, t, jNext] - rC[c, t, jPrev];
-        var P11: [1..3] real; for c in 1..3 do P11[c] = rA[c, t, j];
-        var P12: [1..3] real; for c in 1..3 do P12[c] = rB[c, t, j];
-        var P21: [1..3] real; for c in 1..3 do P21[c] = rA[c, t, jNext];
-        var P22: [1..3] real; for c in 1..3 do P22[c] = rB[c, t, jNext];
+        var Z = mkVec(rC[1, t, jNext] - rC[1, t, jPrev],
+                      rC[2, t, jNext] - rC[2, t, jPrev],
+                      rC[3, t, jNext] - rC[3, t, jPrev]);
+        var P11 = mkVec(rA[1, t, j], rA[2, t, j], rA[3, t, j]);
+        var P12 = mkVec(rB[1, t, j], rB[2, t, j], rB[3, t, j]);
+        var P21 = mkVec(rA[1, t, jNext], rA[2, t, jNext],
+                        rA[3, t, jNext]);
+        var P22 = mkVec(rB[1, t, jNext], rB[2, t, jNext],
+                        rB[3, t, jNext]);
         tw[t, j] = twistAngle(P11, P12, P21, P22, Z);
       }
     }
 
-    // Write tw.ser
+    // Write tw.ser (serial I/O)
     try! {
       var f = open(inName + "/tw.ser", ioMode.cw);
       var writer = f.writer();
@@ -374,40 +318,38 @@ module WrLINE {
    * Calculate central helical axis (CAXIS).
    * Running average of each bp with its 2*k neighbours,
    * weighted by the excess base pair beyond 360 degrees of twist.
+   * Parallelized over base pairs.
    */
   proc caxis(inNbp: int, inNstep: int,
-             r: [1..3, 1..inNstep, 1..inNbp] real,
-             tw: [1..inNstep, 1..inNbp] real) {
+             ref r: [1..3, 1..inNstep, 1..inNbp] real,
+             ref tw: [1..inNstep, 1..inNbp] real) {
     var r1: [1..3, 1..inNstep, 1..inNbp] real;
-    for j in 1..inNbp {
-      if j % 100 == 0 then
-        writeln("now working on basepairs ", j, "s...");
+    forall j in 1..inNbp {
       for t in 1..inNstep {
         var Tw = tw[t, j];
-        var sumVal: [1..3] real;
-        for c in 1..3 do sumVal[c] = r[c, t, j];
+        var sx = r[1, t, j], sy = r[2, t, j], sz = r[3, t, j];
         var k = 0;
-        var prev = Tw; // track twist total before last addition
+        var prev = Tw;
         while Tw < 360.0 {
           k += 1;
           prev = Tw;
           var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
           var jp = ((j - 1 + k) % inNbp) + 1;
           Tw += tw[t, jm] + tw[t, jp];
-          for c in 1..3 {
-            sumVal[c] += r[c, t, jm] + r[c, t, jp];
-          }
+          sx += r[1, t, jm] + r[1, t, jp];
+          sy += r[2, t, jm] + r[2, t, jp];
+          sz += r[3, t, jm] + r[3, t, jp];
         }
-        // Weight: how much of the last added pair to keep
         var w = (360.0 - prev) / (Tw - prev);
         var jmW = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
         var jpW = ((j - 1 + k) % inNbp) + 1;
-        for c in 1..3 {
-          sumVal[c] -= (1.0 - w) * (r[c, t, jmW] + r[c, t, jpW]);
-        }
-        for c in 1..3 {
-          r1[c, t, j] = sumVal[c] / (2.0 * (k:real + w) - 1.0);
-        }
+        sx -= (1.0 - w) * (r[1, t, jmW] + r[1, t, jpW]);
+        sy -= (1.0 - w) * (r[2, t, jmW] + r[2, t, jpW]);
+        sz -= (1.0 - w) * (r[3, t, jmW] + r[3, t, jpW]);
+        var denom = 2.0 * (k: real + w) - 1.0;
+        r1[1, t, j] = sx / denom;
+        r1[2, t, j] = sy / denom;
+        r1[3, t, j] = sz / denom;
       }
     }
     return r1;
@@ -415,64 +357,53 @@ module WrLINE {
 
   /*
    * Calculate sine of the register angles.
+   * Parallelized over base pairs.
    * Saves sinreg.ser file.
    */
   proc sinreg(inName: string, inNbp: int, inNstep: int,
-              r: [1..3, 1..inNstep, 1..inNbp] real,
-              r1: [1..3, 1..inNstep, 1..inNbp] real) {
-    // SinReg: [1..nstep, 1..nbp+1], first column is time index
+              ref r: [1..3, 1..inNstep, 1..inNbp] real,
+              ref r1: [1..3, 1..inNstep, 1..inNbp] real) {
     var sinRegArr: [1..inNstep, 0..inNbp] real;
-    for j in 1..inNbp {
-      if j % 100 == 0 then
-        writeln("now working on basepairs ", j, "s...");
-      // m = [j-1, j, j+1] % nbp (1-based circular)
+
+    forall j in 1..inNbp {
       var m0 = ((j - 2 + inNbp) % inNbp) + 1;
       var m1 = j;
       var m2 = (j % inNbp) + 1;
 
-      // v0 = r1[:,:,m1] - r1[:,:,m0]
-      // v1 = r1[:,:,m2] - r1[:,:,m1]
-      var v0: [1..3, 1..inNstep] real;
-      var v1: [1..3, 1..inNstep] real;
-      var M: [1..3, 1..inNstep] real; // minor groove vector
       for t in 1..inNstep {
-        for c in 1..3 {
-          v0[c, t] = r1[c, t, m1] - r1[c, t, m0];
-          v1[c, t] = r1[c, t, m2] - r1[c, t, m1];
-          M[c, t] = r[c, t, m0] - r1[c, t, m0];
-        }
-      }
+        // v0 = r1[:,t,m1] - r1[:,t,m0]
+        var v0 = mkVec(r1[1, t, m1] - r1[1, t, m0],
+                       r1[2, t, m1] - r1[2, t, m0],
+                       r1[3, t, m1] - r1[3, t, m0]);
+        var v1 = mkVec(r1[1, t, m2] - r1[1, t, m1],
+                       r1[2, t, m2] - r1[2, t, m1],
+                       r1[3, t, m2] - r1[3, t, m1]);
+        var M = mkVec(r[1, t, m0] - r1[1, t, m0],
+                      r[2, t, m0] - r1[2, t, m0],
+                      r[3, t, m0] - r1[3, t, m0]);
 
-      var crossV1V0 = crossTS(v1, v0);       // plane vector C
-      var crossMC = crossTS(M, crossV1V0);
-      var sizeM = sizeTS(M);
-      var sizeC = sizeTS(crossV1V0);
-      var sizeMC = sizeTS(crossMC);
+        var C = vecCross(v1, v0);
+        var MC = vecCross(M, C);
+        var sizeM = vecNorm(M);
+        var sizeC = vecNorm(C);
+        var sizeMC = vecNorm(MC);
 
-      for t in 1..inNstep {
-        sinRegArr[t, j] = sizeMC[t] / (sizeM[t] * sizeC[t]);
-      }
+        var val = sizeMC / (sizeM * sizeC);
 
-      // Determine sign: (+) for minor groove into the circle
-      var diff: [1..3, 1..inNstep] real;
-      for t in 1..inNstep {
-        for c in 1..3 {
-          diff[c, t] = v1[c, t] - v0[c, t];
-        }
-      }
-      var dotVal = dotTS(diff, M);
-      for t in 1..inNstep {
-        if dotVal[t] < 0.0 then
-          sinRegArr[t, j] = -sinRegArr[t, j];
+        // Sign: (+) for minor groove into the circle
+        var diff = vecSub(v1, v0);
+        if vecDot(diff, M) < 0.0 then val = -val;
+
+        sinRegArr[t, j] = val;
       }
     }
 
-    // First column: time scale (0.01 * step)
+    // First column: time scale (serial)
     for t in 1..inNstep {
       sinRegArr[t, 0] = 0.01 * t: real;
     }
 
-    // Write sinreg.ser
+    // Write sinreg.ser (serial I/O)
     try! {
       var f = open(inName + "/sinreg.ser", ioMode.cw);
       var writer = f.writer();
@@ -487,20 +418,18 @@ module WrLINE {
   }
 
   /*
-   * Create output xyz and 3col files from r (midpoints) and r1 (CAXIS).
+   * Create output xyz and 3col files (serial I/O — no benefit from
+   * parallelism for sequential file writes).
    */
   proc makeFiles(inName: string, inNbp: int, inNstep: int,
-                 r: [1..3, 1..inNstep, 1..inNbp] real,
-                 r1: [1..3, 1..inNstep, 1..inNbp] real) {
+                 ref r: [1..3, 1..inNstep, 1..inNbp] real,
+                 ref r1: [1..3, 1..inNstep, 1..inNbp] real) {
     try! {
-      // Write xyz files
       var fxyz = open(inName + "/C.xyz", ioMode.cw);
       var wxyz = fxyz.writer();
       var fxyz1 = open(inName + "/C1.xyz", ioMode.cw);
       var wxyz1 = fxyz1.writer();
       for i in 1..inNstep {
-        if i % 1000 == 0 then
-          writeln(i, "steps has been written for .xyz output");
         wxyz.writeln(inNbp);
         wxyz.writeln();
         wxyz1.writeln(inNbp);
@@ -515,14 +444,11 @@ module WrLINE {
       wxyz.close();
       wxyz1.close();
 
-      // Write 3col files
       var fc = open(inName + "/C.3col", ioMode.cw);
       var wc = fc.writer();
       var fc1 = open(inName + "/C1.3col", ioMode.cw);
       var wc1 = fc1.writer();
       for i in 1..inNstep {
-        if i % 1000 == 0 then
-          writeln(i, "steps has been written for .3col output");
         for j in 1..inNbp {
           wc.writef("%8.3dr %8.3dr %8.3dr \n",
                     r[1, i, j], r[2, i, j], r[3, i, j]);
@@ -536,12 +462,50 @@ module WrLINE {
   }
 
   // -----------------------------------------------------------------------
-  // WRITHE CALCULATION (from writhe.py)
+  // WRITHE CALCULATION — heavily parallelized
   // -----------------------------------------------------------------------
 
   /*
+   * Writhe for a single timestep. The O(n²) double loop is
+   * parallelized over j with a reduction on Wr.
+   */
+  proc wr(ref X: [?D] real, t: int, l: int): real {
+    // Build y: copy frame t and append first point (closure)
+    var y: [1..l + 1, 1..3] real;
+    for j in 1..l {
+      for c in 1..3 do y[j, c] = X[t, j, c];
+    }
+    for c in 1..3 do y[l + 1, c] = X[t, 1, c];
+
+    // Parallel reduction over outer loop
+    var Wr: real = 0.0;
+    forall j in 1..l with (+ reduce Wr) {
+      for k in 1..j - 1 {
+        var tjx = y[j + 1, 1] - y[j, 1];
+        var tjy = y[j + 1, 2] - y[j, 2];
+        var tjz = y[j + 1, 3] - y[j, 3];
+        var tkx = y[k + 1, 1] - y[k, 1];
+        var tky = y[k + 1, 2] - y[k, 2];
+        var tkz = y[k + 1, 3] - y[k, 3];
+        var rjkx = y[j, 1] - y[k, 1];
+        var rjky = y[j, 2] - y[k, 2];
+        var rjkz = y[j, 3] - y[k, 3];
+
+        // cross(tj, tk)
+        var cx = tjy * tkz - tjz * tky;
+        var cy = tjz * tkx - tjx * tkz;
+        var cz = tjx * tky - tjy * tkx;
+
+        var dotVal = rjkx * cx + rjky * cy + rjkz * cz;
+        var normRjk = sqrt(rjkx**2 + rjky**2 + rjkz**2);
+        Wr += dotVal / (normRjk ** 3.0) / (2.0 * pi);
+      }
+    }
+    return Wr;
+  }
+
+  /*
    * Read a 3-column coordinate file and split it by timestep.
-   * Returns X: [1..nstep, 1..nbp, 1..3].
    */
   proc readThreeCol(filename: string, inNbp: int,
                     inNstep: int): [1..inNstep, 1..inNbp, 1..3] real {
@@ -562,42 +526,8 @@ module WrLINE {
   }
 
   /*
-   * Writhe for a single timestep.
-   * x: [1..nstep, 1..nbp, 1..3], t: timestep index, l: number of bp.
-   * Returns the writhe using the discretized Gauss linking integral.
-   */
-  proc wr(x: [] real, t: int, l: int): real {
-    // Build y: copy frame t and append first point at end (closure)
-    var y: [1..l + 1, 1..3] real;
-    for j in 1..l {
-      for c in 1..3 do y[j, c] = x[t, j, c];
-    }
-    for c in 1..3 do y[l + 1, c] = x[t, 1, c];
-
-    var Wr = 0.0;
-    for j in 1..l {
-      for k in 1..j - 1 {
-        var tj: [1..3] real; // tangent at j
-        var tk: [1..3] real; // tangent at k
-        var rjk: [1..3] real; // vector from k to j
-        for c in 1..3 {
-          tj[c] = y[j + 1, c] - y[j, c];
-          tk[c] = y[k + 1, c] - y[k, c];
-          rjk[c] = y[j, c] - y[k, c];
-        }
-        var crossTjTk = crossVec(tj, tk);
-        var dotVal = + reduce(rjk * crossTjTk);
-        var normRjk = norm(rjk);
-        var W = dotVal / (normRjk ** 3.0) / (2.0 * pi);
-        Wr += W;
-      }
-    }
-    return Wr;
-  }
-
-  /*
    * Main writhe calculation: reads C1.3col, computes writhe for each
-   * timestep, and saves to writhe.ser.
+   * timestep in parallel, and saves to writhe.ser.
    */
   proc calcWrithe(inName: string, inNbp: int, inNstep: int) {
     writeln("Calculating Writhe...");
@@ -605,28 +535,27 @@ module WrLINE {
     var X = readThreeCol(inp, inNbp, inNstep);
     var l = inNbp;
 
-    // Calculate writhe for each timestep
+    // Calculate writhe for each timestep — embarrassingly parallel
     var writheArr: [1..inNstep, 1..2] real;
-    for t in 1..inNstep {
-      if t % 100 == 0 then
-        writeln("now working on steps ", t, "s...");
+    forall t in 1..inNstep {
       writheArr[t, 1] = t: real;
       writheArr[t, 2] = wr(X, t, l);
     }
 
-    // Write writhe.ser
+    // Write writhe.ser (serial I/O)
     try! {
       var f = open(inName + "/writhe.ser", ioMode.cw);
       var writer = f.writer();
       for t in 1..inNstep {
-        writer.writef("%5i %9.4dr\n", writheArr[t, 1]: int, writheArr[t, 2]);
+        writer.writef("%5i %9.4dr\n", writheArr[t, 1]: int,
+                      writheArr[t, 2]);
       }
       writer.close();
     }
   }
 
   // -----------------------------------------------------------------------
-  // MAIN (from WrLINE.py)
+  // MAIN
   // -----------------------------------------------------------------------
 
   proc main() {
@@ -671,7 +600,8 @@ module WrLINE {
       writeln("calculating register angles for ", name, "...");
       sinreg(name, nbp, nstep, r, r1);
 
-      writeln("now making output .xyz and .3col files for ", name, "...");
+      writeln("now making output .xyz and .3col files for ", name,
+              "...");
       makeFiles(name, nbp, nstep, r, r1);
 
       // Writhe calculation

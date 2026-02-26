@@ -1,0 +1,36 @@
+# Config file for SerraLINE
+# Lines beginning with '#' or 'c' are treated as comments.
+# Format:  key = value
+# Any key not listed here will use the compiled-in default.
+# CLI flags (--key=value) always take precedence over this file.
+# -------------------------------------------------------------------
+
+# Topology file (AMBER .prmtop format) — optional if strandsType = 0
+top = my_dna.prmtop
+
+# Trajectory file (.xyz or .3col format)
+traj = C1.xyz
+
+# Closed (true) or open/linear (false) structure (default: false)
+isCircular = false
+
+# Strand type: 0 = no topology, 1 = single-stranded, 2 = double-stranded (default: 1)
+strandsType = 1
+
+# Number of base-pairs — only needed when strandsType = 0 (default: 0)
+# nbpArg = 336
+
+# Fit a plane to the molecule (default: true)
+fitplane = true
+
+# Comma-separated bp indices to use for plane fitting; "0" means all (default: 0)
+bpFitting = 0
+
+# Tangent vector separation length (default: 1)
+tLength = 1
+
+# Print projected trajectory (default: false)
+printProj = false
+
+# Output format for projected trajectory: true = xyz, false = crd (default: false)
+xyzFormat = true

@@ -13,42 +13,112 @@ module Analysis {
   use CustomIO;
   use Math;
   use IO;
+  use Map;
 
   // Command-line configuration -- maps to the ov_NA.in inputs in the Fortran.
-  config const elasFile: string = "elastic.out";
-  config const strucFile: string = "structural.out";
+  config var configFile: string = "";
+  config var elasFile: string = "elastic.out";
+  config var strucFile: string = "structural.out";
 
   // Persistence-length subfragment [rA_a..rA_b] and sublength [rA_l1..rA_l2]
-  config const rA_a:  int = 0;
-  config const rA_b:  int = 0;
-  config const rA_l1: int = 0;
-  config const rA_l2: int = 0;
+  config var rA_a:  int = 0;
+  config var rA_b:  int = 0;
+  config var rA_l1: int = 0;
+  config var rA_l2: int = 0;
 
   // Twist subfragment and sublength
-  config const rT_a:  int = 0;
-  config const rT_b:  int = 0;
-  config const rT_l1: int = 0;
-  config const rT_l2: int = 0;
+  config var rT_a:  int = 0;
+  config var rT_b:  int = 0;
+  config var rT_l1: int = 0;
+  config var rT_l2: int = 0;
 
   // Stretch subfragment and sublength
-  config const rS_a:  int = 0;
-  config const rS_b:  int = 0;
-  config const rS_l1: int = 0;
-  config const rS_l2: int = 0;
+  config var rS_a:  int = 0;
+  config var rS_b:  int = 0;
+  config var rS_l1: int = 0;
+  config var rS_l2: int = 0;
+
+  /*
+   * Parse a simple key = value config file.
+   * Lines beginning with 'c' or '#' are treated as comments.
+   * Returns a map of key -> value strings.
+   */
+  proc parseConfigFile(path: string) {
+    var cfg: map(string, string);
+    try! {
+      var f = open(path, ioMode.r);
+      var reader = f.reader();
+      var line: string;
+      while reader.readLine(line) {
+        line = line.strip();
+        if line == "" then continue;
+        if line[0] == "c" || line[0] == "#" then continue;
+        var eqIdx = line.find("="):int;
+        if eqIdx == -1 then continue;
+        var k = line[0..eqIdx-1].strip();
+        var v = line[eqIdx+1..].strip();
+        cfg.add(k, v);
+      }
+      f.close();
+    }
+    return cfg;
+  }
 
   proc main() {
+    // Load config file values as defaults (CLI flags override them).
+    var cfgElasFile = elasFile;
+    var cfgStrucFile = strucFile;
+    var cfgRaA = rA_a; var cfgRaB = rA_b;
+    var cfgRaL1 = rA_l1; var cfgRaL2 = rA_l2;
+    var cfgRtA = rT_a; var cfgRtB = rT_b;
+    var cfgRtL1 = rT_l1; var cfgRtL2 = rT_l2;
+    var cfgRsA = rS_a; var cfgRsB = rS_b;
+    var cfgRsL1 = rS_l1; var cfgRsL2 = rS_l2;
+
+    if configFile != "" {
+      var cfg = parseConfigFile(configFile);
+      if elasFile == "elastic.out" && cfg.contains("elasFile") then
+        cfgElasFile = try! cfg["elasFile"];
+      if strucFile == "structural.out" && cfg.contains("strucFile") then
+        cfgStrucFile = try! cfg["strucFile"];
+      if rA_a == 0 && cfg.contains("rA_a") then
+        cfgRaA = try! cfg["rA_a"]:int;
+      if rA_b == 0 && cfg.contains("rA_b") then
+        cfgRaB = try! cfg["rA_b"]:int;
+      if rA_l1 == 0 && cfg.contains("rA_l1") then
+        cfgRaL1 = try! cfg["rA_l1"]:int;
+      if rA_l2 == 0 && cfg.contains("rA_l2") then
+        cfgRaL2 = try! cfg["rA_l2"]:int;
+      if rT_a == 0 && cfg.contains("rT_a") then
+        cfgRtA = try! cfg["rT_a"]:int;
+      if rT_b == 0 && cfg.contains("rT_b") then
+        cfgRtB = try! cfg["rT_b"]:int;
+      if rT_l1 == 0 && cfg.contains("rT_l1") then
+        cfgRtL1 = try! cfg["rT_l1"]:int;
+      if rT_l2 == 0 && cfg.contains("rT_l2") then
+        cfgRtL2 = try! cfg["rT_l2"]:int;
+      if rS_a == 0 && cfg.contains("rS_a") then
+        cfgRsA = try! cfg["rS_a"]:int;
+      if rS_b == 0 && cfg.contains("rS_b") then
+        cfgRsB = try! cfg["rS_b"]:int;
+      if rS_l1 == 0 && cfg.contains("rS_l1") then
+        cfgRsL1 = try! cfg["rS_l1"]:int;
+      if rS_l2 == 0 && cfg.contains("rS_l2") then
+        cfgRsL2 = try! cfg["rS_l2"]:int;
+    }
+
     // -----------------------------------------------------------------------
     // READING SECTION
     // -----------------------------------------------------------------------
     // Read elastic parameters from file.
     var (_, enbp, eframes, _, estr, _, _, _,
          _, _, elasp, ovElasp, _, _, _, _, _, _) =
-      readElasticParms(elasFile);
+      readElasticParms(cfgElasFile);
 
     // Read structural parameters from file.
     var (_, _, _, _, _, _, _, _,
          _, _, _, _, strucp, avstrp, ovStrucp, ovAvstrp, _, _) =
-      readStructuralParms(strucFile);
+      readStructuralParms(cfgStrucFile);
 
     var nbp    = enbp;
     var frames = eframes;
@@ -61,22 +131,22 @@ module Analysis {
     // BUILD RANGE ARRAYS
     // -----------------------------------------------------------------------
     var rA: [1..2, 1..2] int;
-    rA[1, 1] = rA_a;
-    rA[2, 1] = rA_b;
-    rA[1, 2] = rA_l1;
-    rA[2, 2] = rA_l2;
+    rA[1, 1] = cfgRaA;
+    rA[2, 1] = cfgRaB;
+    rA[1, 2] = cfgRaL1;
+    rA[2, 2] = cfgRaL2;
 
     var rT: [1..2, 1..2] int;
-    rT[1, 1] = rT_a;
-    rT[2, 1] = rT_b;
-    rT[1, 2] = rT_l1;
-    rT[2, 2] = rT_l2;
+    rT[1, 1] = cfgRtA;
+    rT[2, 1] = cfgRtB;
+    rT[1, 2] = cfgRtL1;
+    rT[2, 2] = cfgRtL2;
 
     var rS: [1..2, 1..2] int;
-    rS[1, 1] = rS_a;
-    rS[2, 1] = rS_b;
-    rS[1, 2] = rS_l1;
-    rS[2, 2] = rS_l2;
+    rS[1, 1] = cfgRsA;
+    rS[2, 1] = cfgRsB;
+    rS[1, 2] = cfgRsL1;
+    rS[2, 2] = cfgRsL2;
 
     // -----------------------------------------------------------------------
     // VALIDATE RANGES
@@ -345,7 +415,7 @@ module Analysis {
    * Size of the averaging vector for a subfragment [a, b] over nbp base-pairs.
    * Mirrors Analysis.f90's A_n / T_n / S_n calculation.
    */
-  private proc rangeN(a: int, b: int, nbp: int): int {
+  private inline proc rangeN(a: int, b: int, nbp: int): int {
     if a < b then return b - a;
     else if b > a then return nbp + b - a;
     else return nbp - 1; // a == b == 0: whole fragment
@@ -355,7 +425,7 @@ module Analysis {
    * Validate a subfragment selection [a, b] against nbp.
    * Halts with a descriptive message if invalid.
    */
-  private proc validateSubfrag(a: int, b: int, nbp: int,
+  private inline proc validateSubfrag(a: int, b: int, nbp: int,
                                 str: int, name: string) {
     if a == b && b != 0 && a != 0 then
       halt("Invalid subfragment selection for " + name);
@@ -373,7 +443,7 @@ module Analysis {
    * Validate a sublength selection [l1, l2] for a given quantity.
    * Also validates that [l1,l2] fits inside the subfragment [a, b].
    */
-  private proc validateSublen(l1: int, l2: int, a: int, b: int,
+  private inline proc validateSublen(l1: int, l2: int, a: int, b: int,
                                nbp: int, str: int, name: string) {
     if l1 == l2 && l1 != 0 && l2 != 0 then
       halt("Invalid sublength selection for " + name);
@@ -413,7 +483,7 @@ module Analysis {
     writef("%-15s %-15s %-15s %-15s %-15s %-15s\n",
            "", "Elastic cte", "Intercept", "Slope",
            "Confidence-I", "Strd Error");
-    writeln("-------------------------------------------------------------------------------------------");
+    writeln("--------------------------------------------------------");
 
     writef("%-15s %15.3f %15s %15s %15s %15.3f\n",
            "Tilt (nm):", Tilt[1], "#", "#", "#", Tilt[2]);

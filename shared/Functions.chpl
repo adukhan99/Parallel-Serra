@@ -11,6 +11,74 @@ module Functions {
   use CustomIO;
 
   // -----------------------------------------------------------------------
+  // TUPLE-BASED VECTOR MATH (stack-allocated, no heap overhead)
+  // -----------------------------------------------------------------------
+
+  inline proc mkVec3(x: real, y: real, z: real): vec3 {
+    return (x, y, z);
+  }
+
+  inline proc vec3Add(a: vec3, b: vec3): vec3 {
+    return (a(0) + b(0), a(1) + b(1), a(2) + b(2));
+  }
+
+  inline proc vec3Sub(a: vec3, b: vec3): vec3 {
+    return (a(0) - b(0), a(1) - b(1), a(2) - b(2));
+  }
+
+  inline proc vec3Scale(a: vec3, s: real): vec3 {
+    return (a(0) * s, a(1) * s, a(2) * s);
+  }
+
+  inline proc vec3Dot(a: vec3, b: vec3): real {
+    return a(0) * b(0) + a(1) * b(1) + a(2) * b(2);
+  }
+
+  inline proc vec3Norm(a: vec3): real {
+    return sqrt(a(0)**2 + a(1)**2 + a(2)**2);
+  }
+
+  inline proc vec3Norm2(a: vec3): real {
+    return a(0)**2 + a(1)**2 + a(2)**2;
+  }
+
+  inline proc vec3Normalize(a: vec3): vec3 {
+    var n = vec3Norm(a);
+    if n < eps then return a;
+    return (a(0) / n, a(1) / n, a(2) / n);
+  }
+
+  inline proc vec3Cross(a: vec3, b: vec3): vec3 {
+    return (a(1) * b(2) - a(2) * b(1),
+            a(2) * b(0) - a(0) * b(2),
+            a(0) * b(1) - a(1) * b(0));
+  }
+
+  // Matrix-vector multiply: M * v
+  inline proc mat3Vec(m: mat3, v: vec3): vec3 {
+    return (vec3Dot(m(0), v),
+            vec3Dot(m(1), v),
+            vec3Dot(m(2), v));
+  }
+
+  // Matrix-matrix multiply: A * B
+  inline proc mat3Mul(a: mat3, b: mat3): mat3 {
+    // Columns of B
+    var b0 = mkVec3(b(0)(0), b(1)(0), b(2)(0));
+    var b1 = mkVec3(b(0)(1), b(1)(1), b(2)(1));
+    var b2 = mkVec3(b(0)(2), b(1)(2), b(2)(2));
+    return ((vec3Dot(a(0), b0), vec3Dot(a(0), b1), vec3Dot(a(0), b2)),
+            (vec3Dot(a(1), b0), vec3Dot(a(1), b1), vec3Dot(a(1), b2)),
+            (vec3Dot(a(2), b0), vec3Dot(a(2), b1), vec3Dot(a(2), b2)));
+  }
+
+  inline proc mat3Transpose(m: mat3): mat3 {
+    return ((m(0)(0), m(1)(0), m(2)(0)),
+            (m(0)(1), m(1)(1), m(2)(1)),
+            (m(0)(2), m(1)(2), m(2)(2)));
+  }
+
+  // -----------------------------------------------------------------------
   // GENERAL FUNCTIONS AND SUBROUTINES
   // -----------------------------------------------------------------------
 
@@ -34,24 +102,24 @@ module Functions {
   }
 
   /* Absolute value (norm) of a vector or promoted expression */
-  proc absv(a) {
+  inline proc absv(a) {
     return sqrt(+ reduce(a**2));
   }
 
   /* Square of squared norm of a vector or promoted expression */
-  proc absv2(a) {
+  inline proc absv2(a) {
     return + reduce(a**2);
   }
 
   /* Normalize a vector or promoted expression */
-  proc normalizeVector(v) {
+  inline proc normalizeVector(v) {
     var vsum = sqrt(+ reduce(v**2));
     if vsum < eps then return v;
     return v / vsum;
   }
 
   /* Cross product of two 3D vectors */
-  proc crossProduct3(U: [1..3] real, V: [1..3] real) {
+  inline proc crossProduct3(U: [1..3] real, V: [1..3] real) {
     var res: [1..3] real;
     res[1] = U[2]*V[3] - U[3]*V[2];
     res[2] = U[3]*V[1] - U[1]*V[3];
@@ -150,26 +218,42 @@ module Functions {
     return dot(u, v) * v;
   }
 
-  /* Matrix inversion for 3x3 matrix */
-  proc matrixInversion3X3(A: [1..3, 1..3] real) {
+  /* Matrix inversion for 3x3 matrix (tuple-based) */
+  inline proc mat3Inversion(A: mat3): mat3 {
     var det_A = 
-    A[1,1]*A[2,2]*A[3,3] + A[1,2]*A[2,3]*A[3,1] + A[1,3]*A[2,1]*A[3,2] 
-    - A[3,1]*A[2,2]*A[1,3] - A[3,2]*A[2,3]*A[1,1] - A[3,3]*A[2,1]*A[1,2];
+      A(0)(0)*A(1)(1)*A(2)(2) + A(0)(1)*A(1)(2)*A(2)(0) + A(0)(2)*A(1)(0)*A(2)(1) 
+      - A(2)(0)*A(1)(1)*A(0)(2) - A(2)(1)*A(1)(2)*A(0)(0) - A(2)(2)*A(1)(0)*A(0)(1);
 
     if abs(det_A) < eps then halt("0 determinant of matrix A");
 
-    var I_A: [1..3, 1..3] real;
-    I_A[1,1] = A[2,2]*A[3,3] - A[2,3]*A[3,2];
-    I_A[1,2] = A[1,3]*A[3,2] - A[1,2]*A[3,3];
-    I_A[1,3] = A[1,2]*A[2,3] - A[1,3]*A[2,2];
-    I_A[2,1] = A[2,3]*A[3,1] - A[2,1]*A[3,3];
-    I_A[2,2] = A[1,1]*A[3,3] - A[1,3]*A[3,1];
-    I_A[2,3] = A[1,3]*A[2,1] - A[1,1]*A[2,3];
-    I_A[3,1] = A[2,1]*A[3,2] - A[2,2]*A[3,1];
-    I_A[3,2] = A[1,2]*A[3,1] - A[1,1]*A[3,2];
-    I_A[3,3] = A[1,1]*A[2,2] - A[1,2]*A[2,1];
+    var inv: mat3;
+    inv(0) = (A(1)(1)*A(2)(2) - A(1)(2)*A(2)(1),
+              A(0)(2)*A(2)(1) - A(0)(1)*A(2)(2),
+              A(0)(1)*A(1)(2) - A(0)(2)*A(1)(1));
+    inv(1) = (A(1)(2)*A(2)(0) - A(1)(0)*A(2)(2),
+              A(0)(0)*A(2)(2) - A(0)(2)*A(2)(0),
+              A(0)(2)*A(1)(0) - A(0)(0)*A(1)(2));
+    inv(2) = (A(1)(0)*A(2)(1) - A(1)(1)*A(2)(0),
+              A(0)(1)*A(2)(0) - A(0)(0)*A(2)(1),
+              A(0)(0)*A(1)(1) - A(0)(1)*A(1)(0));
 
-    return I_A / det_A;
+    var detInv = 1.0 / det_A;
+    return ((inv(0)(0) * detInv, inv(0)(1) * detInv, inv(0)(2) * detInv),
+            (inv(1)(0) * detInv, inv(1)(1) * detInv, inv(1)(2) * detInv),
+            (inv(2)(0) * detInv, inv(2)(1) * detInv, inv(2)(2) * detInv));
+  }
+
+  /* Matrix inversion for 3x3 matrix (array-based, delegates to mat3Inversion) */
+  proc matrixInversion3X3(A: [1..3, 1..3] real) {
+    var tA: mat3 = ((A[1,1], A[1,2], A[1,3]),
+                    (A[2,1], A[2,2], A[2,3]),
+                    (A[3,1], A[3,2], A[3,3]));
+    var res = mat3Inversion(tA);
+    var R: [1..3, 1..3] real;
+    for i in 1..3 do
+      for j in 1..3 do
+        R[i,j] = res(i-1)(j-1);
+    return R;
   }
 
   /* Analytic inversion of 4x4 matrix */
@@ -320,192 +404,373 @@ module Functions {
   // SerraNA FUNCTIONS
   // -----------------------------------------------------------------------
 
-  /* Orientation matrix R and origin vector O of a base */
-  proc getRotationROriginO(Ex: [] real,
-                           St: [] real) {
-    var av_Ex: [1..3] real;
-    var av_St: [1..3] real;
+  /* Jacobi diagonalization method for real symmetric mat4 (tuple-based) */
+  inline proc diagonalizationJacobi4(M: mat4) {
+    var S = M;
+    var V: mat4 = ((1.0, 0.0, 0.0, 0.0),
+                   (0.0, 1.0, 0.0, 0.0),
+                   (0.0, 0.0, 1.0, 0.0),
+                   (0.0, 0.0, 0.0, 1.0));
+
+    var cond = 4.0;
+    var r = 0;
+    const cont = 50;
+
+    while cond > eps && r < cont {
+      r += 1;
+      var larg = -1.0;
+      var i, j: int;
+      for k in 0..2 {
+        for l in k+1..3 {
+          if larg < abs(S(k)(l)) {
+            larg = abs(S(k)(l));
+            i = k;
+            j = l;
+          }
+        }
+      }
+
+      var th: real;
+      if S(i)(i) == S(j)(j) {
+        th = pi / 4.0;
+      } else {
+        th = 0.5 * atan(2.0 * S(i)(j) / (S(j)(j) - S(i)(i)));
+      }
+
+      var co = cos(th);
+      var si = sin(th);
+      
+      // V = V * G (optimized)
+      for rIdx in 0..3 {
+        var row = V(rIdx);
+        var v_i = row(i);
+        var v_j = row(j);
+        var resRow = row;
+        resRow(i) = v_i * co - v_j * si;
+        resRow(j) = v_i * si + v_j * co;
+        V(rIdx) = resRow;
+      }
+
+      // S = G^T * S * G (optimized)
+      var newS = S;
+      for k in 0..3 {
+        if k == i || k == j then continue;
+        var s_ki = S(k)(i);
+        var s_kj = S(k)(j);
+        newS(i)(k) = s_ki * co - s_kj * si;
+        newS(k)(i) = newS(i)(k);
+        newS(j)(k) = s_ki * si + s_kj * co;
+        newS(k)(j) = newS(j)(k);
+      }
+      var s_ii = S(i)(i);
+      var s_jj = S(j)(j);
+      var s_ij = S(i)(j);
+      newS(i)(i) = s_ii * co**2 + s_jj * si**2 - 2.0 * s_ij * si * co;
+      newS(j)(j) = s_ii * si**2 + s_jj * co**2 + 2.0 * s_ij * si * co;
+      newS(i)(j) = 0.0;
+      newS(j)(i) = 0.0;
+      S = newS;
+
+      cond = 0.0;
+      for k in 0..2 {
+        for l in k+1..3 {
+          cond += abs(S(k)(l));
+        }
+      }
+      cond *= 2.0;
+    }
+
+    return (S, V);
+  }
+
+  /* Orientation matrix R and origin vector O of a base (optimized) */
+  proc getRotationROriginO(Ex: [] real, St: [] real) {
+    var av_Ex: vec3 = (0.0, 0.0, 0.0);
+    var av_St: vec3 = (0.0, 0.0, 0.0);
 
     var N_val = Ex.dim(1).size;
-    var N__1 = 1.0 / N_val;
-    var N__1_1 = 1.0 / (N_val - 1);
+    var N_inv = 1.0 / N_val:real;
 
     for k in 1..N_val {
-      for j in 1..3 {
-        av_Ex[j] += Ex[j,k];
-        av_St[j] += St[j,k];
+      av_Ex(0) += Ex[1, k];
+      av_Ex(1) += Ex[2, k];
+      av_Ex(2) += Ex[3, k];
+      av_St(0) += St[1, k];
+      av_St(1) += St[2, k];
+      av_St(2) += St[3, k];
+    }
+    av_Ex = vec3Scale(av_Ex, N_inv);
+    av_St = vec3Scale(av_St, N_inv);
+
+    var C: mat3 = ((0.0,0.0,0.0),(0.0,0.0,0.0),(0.0,0.0,0.0));
+    var N_1_inv = 1.0 / (N_val - 1):real;
+
+    for k in 1..N_val {
+      var dEx = mkVec3(Ex[1, k] - av_Ex(0), Ex[2, k] - av_Ex(1),
+                       Ex[3, k] - av_Ex(2));
+      var dSt = mkVec3(St[1, k] - av_St(0), St[2, k] - av_St(1),
+                       St[3, k] - av_St(2));
+      // C += dSt * dEx^T
+      for i in 0..2 {
+        var row = C(i);
+        for j in 0..2 {
+          row(j) += dSt(i) * dEx(j);
+        }
+        C(i) = row;
       }
     }
-    av_Ex /= N_val:real;
-    av_St /= N_val:real;
+    // Scale C
+    for i in 0..2 do C(i) = vec3Scale(C(i), N_1_inv);
 
-    var I: [1..N_val, 1..1] real;
-    for i in 1..N_val do I[i,1] = 1.0;
+    var M = mat3ToMat4_M(C);
+    var (S, V) = diagonalizationJacobi4(M);
+    var q = largestEigenvec4(S, V);
+    var tR = getRotationR_tuple(q);
+    
+    var R: [1..3, 1..3] real;
+    for i in 0..2 do
+      for j in 0..2 do
+        R[i+1, j+1] = tR(i)(j);
 
-    var A = dot(dot(St, I), dot(transpose(I), transpose(Ex)));
-    var B = dot(St, transpose(Ex));
-    var C = N__1_1 * (B - N__1 * A);
-
-    var M = rsMatrixM(C);
-    var (S, V) = diagonalizationJacobi(M);
-    var eigenvec = largestEigenvec(S, V);
-    var R = getRotationR(eigenvec);
-    var O = av_Ex - dot(av_St, transpose(R));
+    var tO = vec3Sub(av_Ex, mat3Vec(mat3Transpose(tR), av_St));
+    var O: [1..3] real = [tO(0), tO(1), tO(2)];
 
     return (R, O);
   }
 
-  /* Real symmetric matrix M from 3x3 matrix C */
-  proc rsMatrixM(C: [1..3, 1..3] real) {
-    var M: [1..4, 1..4] real;
-    M[1,1] = C[1,1] + C[2,2] + C[3,3];
-    M[1,2] = C[2,3] - C[3,2];
-    M[1,3] = C[3,1] - C[1,3];
-    M[1,4] = C[1,2] - C[2,1];
-    M[2,2] = C[1,1] - C[2,2] - C[3,3];
-    M[2,3] = C[1,2] + C[2,1];
-    M[2,4] = C[3,1] + C[1,3];
-    M[3,3] = -C[1,1] + C[2,2] - C[3,3];
-    M[3,4] = C[2,3] + C[3,2];
-    M[4,4] = -C[1,1] - C[2,2] + C[3,3];
-    
-    for i in 1..4 {
-      for j in 1..i-1 {
-        M[i,j] = M[j,i];
-      }
-    }
+  /* Real symmetric matrix M from 3x3 matrix C (tuple-based) */
+  inline proc mat3ToMat4_M(C: mat3): mat4 {
+    var M: mat4;
+    M(0) = (C(0)(0) + C(1)(1) + C(2)(2),
+            C(1)(2) - C(2)(1),
+            C(2)(0) - C(0)(2),
+            C(0)(1) - C(1)(0));
+    M(1) = (M(0)(1),
+            C(0)(0) - C(1)(1) - C(2)(2),
+            C(0)(1) + C(1)(0),
+            C(2)(0) + C(0)(2));
+    M(2) = (M(0)(2),
+            M(1)(2),
+            -C(0)(0) + C(1)(1) - C(2)(2),
+            C(1)(2) + C(2)(1));
+    M(3) = (M(0)(3),
+            M(1)(3),
+            M(2)(3),
+            -C(0)(0) - C(1)(1) + C(2)(2));
     return M;
   }
 
-  /* Largest eigenvector of matrix M from diagonalization results S and V */
-  proc largestEigenvec(S: [1..4, 1..4] real, V: [1..4, 1..4] real) {
+  /* Real symmetric matrix M from 3x3 matrix C (array-based) */
+  proc rsMatrixM(C: [1..3, 1..3] real) {
+    var tC: mat3 = ((C[1,1], C[1,2], C[1,3]),
+                    (C[2,1], C[2,2], C[2,3]),
+                    (C[3,1], C[3,2], C[3,3]));
+    var res = mat3ToMat4_M(tC);
+    var M: [1..4, 1..4] real;
+    for i in 1..4 do
+      for j in 1..4 do
+        M[i,j] = res(i-1)(j-1);
+    return M;
+  }
+
+  /* Largest eigenvector of matrix M from diagonalization results S and V (tuple-based) */
+  inline proc largestEigenvec4(S: mat4, V: mat4): vec4 {
     var larg = eps;
     var j = 0;
     var k = 0;
-    for i in 1..4 {
-      if S[i,i] < 0.0 then k += 1;
+    for i in 0..3 {
+      if S(i)(i) < 0.0 then k += 1;
       if k == 4 then halt("Error: all eigenvalues negative");
-      if larg < S[i,i] {
-        larg = S[i,i];
+      if larg < S(i)(i) {
+        larg = S(i)(i);
         j = i;
       }
     }
-    return V[1..4, j];
+    return (V(0)(j), V(1)(j), V(2)(j), V(3)(j));
   }
 
-  /* Rotation matrix R from eigenvector q */
-  proc getRotationR(q: [1..4] real) {
-    var R: [1..3, 1..3] real;
-    R[1,1] = q[1]**2 + q[2]**2 - q[3]**2 - q[4]**2;
-    R[1,2] = 2.0 * (q[2]*q[3] - q[1]*q[4]);
-    R[1,3] = 2.0 * (q[2]*q[4] + q[1]*q[3]);
-    R[2,1] = 2.0 * (q[3]*q[2] + q[1]*q[4]);
-    R[2,2] = q[1]**2 - q[2]**2 + q[3]**2 - q[4]**2;
-    R[2,3] = 2.0 * (q[3]*q[4] - q[1]*q[2]);
-    R[3,1] = 2.0 * (q[4]*q[2] - q[1]*q[3]);
-    R[3,2] = 2.0 * (q[4]*q[3] + q[1]*q[2]);
-    R[3,3] = q[1]**2 - q[2]**2 - q[3]**2 + q[4]**2;
+  /* Rotation matrix R from eigenvector q (tuple-based) */
+  inline proc getRotationR_tuple(q: vec4): mat3 {
+    var R: mat3;
+    R(0) = (q(0)**2 + q(1)**2 - q(2)**2 - q(3)**2,
+            2.0 * (q(1)*q(2) - q(0)*q(3)),
+            2.0 * (q(1)*q(3) + q(0)*q(2)));
+    R(1) = (2.0 * (q(2)*q(1) + q(0)*q(3)),
+            q(0)**2 - q(1)**2 + q(2)**2 - q(3)**2,
+            2.0 * (q(2)*q(3) - q(0)*q(1)));
+    R(2) = (2.0 * (q(3)*q(1) - q(0)*q(2)),
+            2.0 * (q(3)*q(2) + q(0)*q(1)),
+            q(0)**2 - q(1)**2 - q(2)**2 + q(3)**2);
     return R;
   }
 
-  /* Base-pair parameters */
-  proc basepairParameters(O1: [1..3] real,
-          O2: [1..3] real,
-          R1: [1..3,
-          1..3] real,
-          R2: [1..3,
-          1..3] real) {
+  /* Rotation matrix R from eigenvector q (array-based) */
+  proc getRotationR(q: [1..4] real) {
+    var tq: vec4 = (q[1], q[2], q[3], q[4]);
+    var res = getRotationR_tuple(tq);
+    var R: [1..3, 1..3] real;
+    for i in 1..3 do
+      for j in 1..3 do
+        R[i,j] = res(i-1)(j-1);
+    return R;
+  }
+
+  /* Rotation matrix R from axis u and angle a (tuple-based) */
+  inline proc mat3Rotation(u: vec3, a: real): mat3 {
+    var ca = cos(a);
+    var sa = sin(a);
+    var omca = 1.0 - ca;
+    var R: mat3;
+    R(0) = (ca + omca * u(0)**2,
+            omca * u(0) * u(1) - u(2) * sa,
+            omca * u(0) * u(2) + u(1) * sa);
+    R(1) = (omca * u(0) * u(1) + u(2) * sa,
+            ca + omca * u(1)**2,
+            omca * u(1) * u(2) - u(0) * sa);
+    R(2) = (omca * u(0) * u(2) - u(1) * sa,
+            omca * u(1) * u(2) + u(0) * sa,
+            ca + omca * u(2)**2);
+    return R;
+  }
+
+  /* Base-pair parameters (optimized) */
+  proc basepairParameters(O1in: [1..3] real, O2in: [1..3] real,
+                          R1in: [1..3, 1..3] real, R2in: [1..3, 1..3] real) {
+    var O1: vec3 = (O1in[1], O1in[2], O1in[3]);
+    var O2: vec3 = (O2in[1], O2in[2], O2in[3]);
+    var R1: mat3 = ((R1in[1,1], R1in[1,2], R1in[1,3]),
+                    (R1in[2,1], R1in[2,2], R1in[2,3]),
+                    (R1in[3,1], R1in[3,2], R1in[3,3]));
+    var R2: mat3 = ((R2in[1,1], R2in[1,2], R2in[1,3]),
+                    (R2in[2,1], R2in[2,2], R2in[2,3]),
+                    (R2in[3,1], R2in[3,2], R2in[3,3]));
+
     var BPP: [1..6] real;
     var Tmbt: [1..3, 1..3] real;
     var Ombt: [1..3] real;
 
-    var dotR2R1 = dot(R2[1..3, 3], R1[1..3, 3]);
+    var dotR2R1 = vec3Dot(R2(2), R1(2)); // index 2 is row 3
     var delta = acos(clamp(dotR2R1, -1.0, 1.0));
     
-    var bp = crossProduct3(R2[1..3, 3], R1[1..3, 3]);
-    bp = normalizeVector(bp);
+    var bp = vec3Normalize(vec3Cross(R2(2), R1(2)));
 
-    var Rbp_minus = generalRotationMatrix(bp, -0.5 * delta);
-    var T1 = dot(Rbp_minus, R1);
+    var T1 = mat3Mul(mat3Rotation(bp, -0.5 * delta), R1);
+    var T2 = mat3Mul(mat3Rotation(bp, 0.5 * delta), R2);
 
-    var Rbp_plus = generalRotationMatrix(bp, 0.5 * delta);
-    var T2 = dot(Rbp_plus, R2);
+    var tTmbt: mat3;
+    for i in 0..2 {
+      var row = vec3Scale(vec3Add(T1(i), T2(i)), 0.5);
+      tTmbt(i) = row;
+    }
+    // Re-normalize columns of Tmbt? The original code did:
+    // for i in 1..3 do Tmbt[1..3, i] = normalizeVector(Tmbt[1..3, i]);
+    // This is normalizing COLUMNS.
+    var col0 = vec3Normalize(mkVec3(tTmbt(0)(0), tTmbt(1)(0), tTmbt(2)(0)));
+    var col1 = vec3Normalize(mkVec3(tTmbt(0)(1), tTmbt(1)(1), tTmbt(2)(1)));
+    var col2 = vec3Normalize(mkVec3(tTmbt(0)(2), tTmbt(1)(2), tTmbt(2)(2)));
+    tTmbt(0) = (col0(0), col1(0), col2(0));
+    tTmbt(1) = (col0(1), col1(1), col2(1));
+    tTmbt(2) = (col0(2), col1(2), col2(2));
 
-    Tmbt = 0.5 * (T1 + T2);
-    for i in 1..3 do Tmbt[1..3, i] = normalizeVector(Tmbt[1..3, i]);
+    for i in 0..2 do
+      for j in 0..2 do
+        Tmbt[i+1, j+1] = tTmbt(i)(j);
 
-    Ombt = 0.5 * (O1 + O2);
+    var tOmbt = vec3Scale(vec3Add(O1, O2), 0.5);
+    Ombt = [tOmbt(0), tOmbt(1), tOmbt(2)];
 
-    var dotT2T1 = dot(T2[1..3, 2], T1[1..3, 2]);
+    var dotT2T1 = vec3Dot(mkVec3(T2(0)(1), T2(1)(1), T2(2)(1)),
+                          mkVec3(T1(0)(1), T1(1)(1), T1(2)(1)));
     BPP[6] = acos(clamp(dotT2T1, -1.0, 1.0));
     
-    var h = crossProduct3(T2[1..3, 2], T1[1..3, 2]);
-    if dot(h, Tmbt[1..3, 3]) < 0.0 then BPP[6] = -BPP[6];
+    var h = vec3Cross(mkVec3(T2(0)(1), T2(1)(1), T2(2)(1)),
+                      mkVec3(T1(0)(1), T1(1)(1), T1(2)(1)));
+    if vec3Dot(h, col2) < 0.0 then BPP[6] = -BPP[6];
 
-    h = crossProduct3(bp, Tmbt[1..3, 2]);
-    var psi = acos(clamp(dot(bp, Tmbt[1..3, 2]), -1.0, 1.0));
-    if dot(h, Tmbt[1..3, 3]) < 0.0 then psi = -psi;
+    var psi = acos(clamp(vec3Dot(bp, col1), -1.0, 1.0));
+    h = vec3Cross(bp, col1);
+    if vec3Dot(h, col2) < 0.0 then psi = -psi;
 
     BPP[5] = delta * cos(psi);
     BPP[4] = delta * sin(psi);
 
-    var dO: [1..3] real = O1 - O2;
-    BPP[1..3] = dot(dO, Tmbt);
+    var dO = vec3Sub(O1, O2);
+    // BPP[1..3] = dot(dO, Tmbt)
+    BPP[1] = vec3Dot(dO, col0);
+    BPP[2] = vec3Dot(dO, col1);
+    BPP[3] = vec3Dot(dO, col2);
 
     for i in 4..6 do BPP[i] *= rad_to_deg;
 
     return (BPP, Tmbt, Ombt);
   }
 
-  /* Base-step parameters */
-  proc basestepParameters(O1: [1..3] real,
-          O2: [1..3] real,
-          R1: [1..3,
-          1..3] real,
-          R2: [1..3,
-          1..3] real,
-          totaltwist: real) {
+  /* Base-step parameters (optimized) */
+  proc basestepParameters(O1in: [1..3] real, O2in: [1..3] real,
+                          R1in: [1..3, 1..3] real, R2in: [1..3, 1..3] real,
+                          totaltwist: real) {
+    var O1: vec3 = (O1in[1], O1in[2], O1in[3]);
+    var O2: vec3 = (O2in[1], O2in[2], O2in[3]);
+    var R1: mat3 = ((R1in[1,1], R1in[1,2], R1in[1,3]),
+                    (R1in[2,1], R1in[2,2], R1in[2,3]),
+                    (R1in[3,1], R1in[3,2], R1in[3,3]));
+    var R2: mat3 = ((R2in[1,1], R2in[1,2], R2in[1,3]),
+                    (R2in[2,1], R2in[2,2], R2in[2,3]),
+                    (R2in[3,1], R2in[3,2], R2in[3,3]));
+
     var BSP: [1..9] real;
     
-    BSP[8] = clamp(dot(R1[1..3, 3], R2[1..3, 3]), -1.0, 1.0);
+    // row 3 is index 2
+    var R1_3 = mkVec3(R1(0)(2), R1(1)(2), R1(2)(2));
+    var R2_3 = mkVec3(R2(0)(2), R2(1)(2), R2(2)(2));
+
+    BSP[8] = clamp(vec3Dot(R1_3, R2_3), -1.0, 1.0);
     BSP[7] = acos(BSP[8]);
 
-    var rt = normalizeVector(crossProduct3(R1[1..3, 3], R2[1..3, 3]));
+    var rt = vec3Normalize(vec3Cross(R1_3, R2_3));
     
-    var Rrt_plus = generalRotationMatrix(rt, 0.5 * BSP[7]);
-    var T1 = dot(Rrt_plus, R1);
+    var T1 = mat3Mul(mat3Rotation(rt, 0.5 * BSP[7]), R1);
+    var T2 = mat3Mul(mat3Rotation(rt, -0.5 * BSP[7]), R2);
 
-    var Rrt_minus = generalRotationMatrix(rt, -0.5 * BSP[7]);
-    var T2 = dot(Rrt_minus, R2);
+    // Tmst = 0.5 * (T1 + T2) then normalize columns
+    var col0 = vec3Normalize(vec3Scale(vec3Add(mkVec3(T1(0)(0), T1(1)(0), T1(2)(0)),
+                                              mkVec3(T2(0)(0), T2(1)(0), T2(2)(0))), 0.5));
+    var col1 = vec3Normalize(vec3Scale(vec3Add(mkVec3(T1(0)(1), T1(1)(1), T1(2)(1)),
+                                              mkVec3(T2(0)(1), T2(1)(1), T2(2)(1))), 0.5));
+    var col2 = vec3Normalize(vec3Scale(vec3Add(mkVec3(T1(0)(2), T1(1)(2), T1(2)(2)),
+                                              mkVec3(T2(0)(2), T2(1)(2), T2(2)(2))), 0.5));
 
-    var Tmst = 0.5 * (T1 + T2);
-    for i in 1..3 do Tmst[1..3, i] = normalizeVector(Tmst[1..3, i]);
+    var T1_2 = mkVec3(T1(0)(1), T1(1)(1), T1(2)(1));
+    var T2_2 = mkVec3(T2(0)(1), T2(1)(1), T2(2)(1));
+    var h = vec3Cross(T1_2, T2_2);
+    BSP[6] = acos(clamp(vec3Dot(T1_2, T2_2), -1.0, 1.0));
+    if vec3Dot(h, col2) < 0.0 then BSP[6] = -BSP[6];
 
-    var h = crossProduct3(T1[1..3, 2], T2[1..3, 2]);
-    BSP[6] = acos(clamp(dot(T1[1..3, 2], T2[1..3, 2]), -1.0, 1.0));
-    if dot(h, Tmst[1..3, 3]) < 0.0 then BSP[6] = -BSP[6];
+    var nbpInt = (totaltwist / 180.0):int;
+    if nbpInt % 2 != 0 then BSP[6] += 2.0 * pi;
 
-    var nbp = (totaltwist / 180.0):int;
-    if nbp % 2 != 0 then BSP[6] += 2.0 * pi;
-
-    nbp = (totaltwist / 360.0):int;
-    BSP[6] += nbp * 2.0 * pi;
+    nbpInt = (totaltwist / 360.0):int;
+    BSP[6] += nbpInt * 2.0 * pi;
 
     if totaltwist - rad_to_deg * BSP[6] > 180.0 then BSP[6] += 2.0 * pi;
     if totaltwist - rad_to_deg * BSP[6] < -180.0 then BSP[6] -= 2.0 * pi;
 
-    nbp = ((BSP[6] + pi) / (2.0 * pi)):int;
-    Tmst[1..3, 1..2] *= (-1)**nbp;
+    nbpInt = ((BSP[6] + pi) / (2.0 * pi)):int;
+    var sign = if nbpInt % 2 != 0 then -1.0 else 1.0;
+    col0 = vec3Scale(col0, sign);
+    col1 = vec3Scale(col1, sign);
 
-    h = crossProduct3(rt, Tmst[1..3, 2]);
-    var phi = acos(clamp(dot(rt, Tmst[1..3, 2]), -1.0, 1.0));
-    if dot(h, Tmst[1..3, 3]) < 0.0 then phi = -phi;
+    h = vec3Cross(rt, col1);
+    var phi = acos(clamp(vec3Dot(rt, col1), -1.0, 1.0));
+    if vec3Dot(h, col2) < 0.0 then phi = -phi;
 
     BSP[4] = BSP[7] * sin(phi);
     BSP[5] = BSP[7] * cos(phi);
     
-    var dO: [1..3] real = O2 - O1;
-    BSP[1..3] = dot(dO, Tmst);
+    var dO = vec3Sub(O2, O1);
+    BSP[1] = vec3Dot(dO, col0);
+    BSP[2] = vec3Dot(dO, col1);
+    BSP[3] = vec3Dot(dO, col2);
 
     for i in 4..7 do BSP[i] *= rad_to_deg;
     BSP[9] = BSP[7]**2;
@@ -551,9 +816,9 @@ module Functions {
     var Tg_i: [1..3, 1..3, 1..nbp] real;
     var rgI: [1..3, 1..nbp] real;
 
-    var x = [1.0, 0.0, 0.0];
-    var y = [0.0, 1.0, 0.0];
-    var z = [0.0, 0.0, 1.0];
+    var x: [1..3] real = [1.0, 0.0, 0.0];
+    var y: [1..3] real = [0.0, 1.0, 0.0];
+    var z: [1..3] real = [0.0, 0.0, 1.0];
 
     rgI[1..3, 1] = 0.0;
     Tg_i[1..3, 1, 1] = x;
@@ -562,7 +827,7 @@ module Functions {
 
     for i in 2..nbp {
       var an12 = sqrt(BSP[4, i-1]**2 + BSP[5, i-1]**2) * deg_to_rad;
-      var ax12 = [BSP[4, i-1]*deg_to_rad/an12, 
+      var ax12: [1..3] real = [BSP[4, i-1]*deg_to_rad/an12, 
                BSP[5, i-1]*deg_to_rad/an12, 0.0];
       var phi = acos(ax12[2]);
       var an3 = BSP[6, i-1] * deg_to_rad;
@@ -578,7 +843,7 @@ module Functions {
       var R3_mid = generalRotationMatrix(z, phi);
       var Ti_mst = dot(dot(R1, R2_mid), R3_mid);
 
-      var hPos = [BSP[1, i-1], BSP[2, i-1], BSP[3, i-1]];
+      var hPos: [1..3] real = [BSP[1, i-1], BSP[2, i-1], BSP[3, i-1]];
       rgI[1..3, i] = dot(hPos, transpose(Ti_mst));
 
       Tg_i[1..3, 1..3, i] = dot(Tg_i[1..3, 1..3, i-1], Tg_i[1..3, 1..3, i]);
@@ -699,7 +964,7 @@ module Functions {
     var avgDistFrame: [1..numFrames] real;
     var maxDistFrame: [1..numFrames] real;
 
-    for k in 1..numFrames {
+    forall k in 1..numFrames {
       var c: [1..3] real;
       var A: [1..3, 1..nbp] real;
       
@@ -712,7 +977,7 @@ module Functions {
         for i in 1..nFitting do A_fit[1..3, i] = A[1..3, bpFitting[i]];
         
         var (S, U) = diagonalizationJacobi(dot(A_fit, transpose(A_fit)));
-        var d = [S[1,1], S[2,2], S[3,3]];
+        var d: [1..3] real = [S[1,1], S[2,2], S[3,3]];
         var minVal = min reduce d;
         for i in 1..3 do if d[i] == minVal then best[k] = i;
 
@@ -732,7 +997,7 @@ module Functions {
         for i in 1..nbp do A[1..3, i] = coords[1..3, i, k] - c;
         
         var (S, U) = diagonalizationJacobi(dot(A, transpose(A)));
-        var d = [S[1,1], S[2,2], S[3,3]];
+        var d: [1..3] real = [S[1,1], S[2,2], S[3,3]];
         var minVal = min reduce d;
         for i in 1..3 do if d[i] == minVal then best[k] = i;
 
@@ -752,13 +1017,13 @@ module Functions {
   }
 
   /* Calculate tangent vectors */
-  proc getTangentVectors(coords: [] real,
+  proc getTangentVectors(ref coords: [] real,
           circleStr: bool,
           tLength: int) {
     var nbp = coords.dim(1).size;
     var numFrames = coords.dim(2).size;
     var tangents: [1..3, 1..nbp, 1..numFrames] real;
-    for k in 1..numFrames {
+    forall k in 1..numFrames {
       for i in 1..nbp-tLength {
         tangents[1..3, i, k] = 
           normalizeVector(coords[1..3, i+tLength, k] - coords[1..3, i, k]);
@@ -866,16 +1131,16 @@ module Functions {
   proc getWidthHeightAratio(ndim: int,
           mdim: int,
           numFrames: int,
-          G_n: [1..3,
+          ref G_n: [1..3,
           1..3,
           1..numFrames] real,
-          best: [1..numFrames] int,
-          coords: [] real) {
+          ref best: [1..numFrames] int,
+          ref coords: [] real) {
     var width: [1..numFrames] real;
     var height: [1..numFrames] real;
     var aratio: [1..numFrames] real;
 
-    for k in 1..numFrames {
+    forall k in 1..numFrames {
       var dOp = -1.0;
       var dR: [1..3] real;
 
@@ -920,16 +1185,16 @@ module Functions {
   /* Calculate widths, heights and aspect ratios for closed structures */
   proc getCWidthHeightAratio(ndim: int,
           numFrames: int,
-          G_n: [1..3,
+          ref G_n: [1..3,
           1..3,
           1..numFrames] real,
-          best: [1..numFrames] int,
-          coords: [] real) {
+          ref best: [1..numFrames] int,
+          ref coords: [] real) {
     var width: [1..numFrames] real;
     var height: [1..numFrames] real;
     var aratio: [1..numFrames] real;
 
-    for k in 1..numFrames {
+    forall k in 1..numFrames {
       var dOp = -1.0;
       var dR: [1..3] real;
 
@@ -974,14 +1239,14 @@ module Functions {
   /* Calculate bending angles between tangent vectors */
   proc getBendings(ndim: int,
           numFrames: int,
-          G_n: [1..3,
+          ref G_n: [1..3,
           1..3,
           1..numFrames] real,
-          best: [1..numFrames] int,
-          tangents: [] real,
+          ref best: [1..numFrames] int,
+          ref tangents: [] real,
           bends_size: int) {
     var bends: [1..numFrames, 1..bends_size] real;
-    for k in 1..numFrames {
+    forall k in 1..numFrames {
       var l = 0;
       var jVal = 1;
       for i in 1..ndim-jVal {
@@ -1013,10 +1278,10 @@ module Functions {
   /* Calculate bending angles without fitting a plane */
   proc getBendingsNofit(ndim: int,
           numFrames: int,
-          tangents: [] real,
+          ref tangents: [] real,
           bends_size: int) {
     var bends: [1..numFrames, 1..bends_size] real;
-    for k in 1..numFrames {
+    forall k in 1..numFrames {
       var l = 0;
       for j in 1..ndim-1 {
         for i in 1..ndim-j {
@@ -1033,13 +1298,13 @@ module Functions {
   /* Calculate bending angles for closed structures */
   proc getCBendings(ndim: int,
           numFrames: int,
-          G_n: [1..3,
+          ref G_n: [1..3,
           1..3,
           1..numFrames] real,
-          best: [1..numFrames] int,
-          tangents: [] real) {
+          ref best: [1..numFrames] int,
+          ref tangents: [] real) {
     var bends: [1..numFrames, 1..ndim, 1..ndim-1] real;
-    for k in 1..numFrames {
+    forall k in 1..numFrames {
       var l = 1;
       for i in 1..ndim-l {
         var j = i + l;
@@ -1087,9 +1352,9 @@ module Functions {
   /* Calculate bending angles for closed structures without fitting a plane */
   proc getCBendingsNofit(ndim: int,
           numFrames: int,
-          tangents: [] real) {
+          ref tangents: [] real) {
     var bends: [1..numFrames, 1..ndim, 1..ndim-1] real;
-    for k in 1..numFrames {
+    forall k in 1..numFrames {
       for l in 1..ndim-1 {
         for i in 1..ndim-l {
           var a = dot(tangents[1..3, i, k], tangents[1..3, i+l, k]);
@@ -1120,7 +1385,7 @@ module Functions {
           writer.writeln(nbp);
           writer.writeln("   ");
           var b = G_n[1..3, best[k], k];
-          var e3_arr = [0.0, 0.0, 1.0];
+          var e3_arr: [1..3] real = [0.0, 0.0, 1.0];
           var angle = acos(clamp(dot(b, e3_arr), -1.0, 1.0));
           var d = normalizeVector(crossProduct3(b, e3_arr));
           var Rot = generalRotationMatrix(d, angle);
@@ -1138,7 +1403,7 @@ module Functions {
         writer.writeln("Generated by SerraLINE");
         for k in 1..numFrames {
           var b = G_n[1..3, best[k], k];
-          var e3_arr = [0.0, 0.0, 1.0];
+          var e3_arr: [1..3] real = [0.0, 0.0, 1.0];
           var angle = acos(clamp(dot(b, e3_arr), -1.0, 1.0));
           var d = normalizeVector(crossProduct3(b, e3_arr));
           var Rot = generalRotationMatrix(d, angle);

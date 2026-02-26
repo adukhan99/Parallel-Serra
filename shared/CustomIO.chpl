@@ -191,7 +191,7 @@ module CustomIO {
                           else rAtomsPerStrand;
       var filteredCoords: [1..3, 1..totalRAtoms, 1..numFrames] real;
 
-      for k in 1..numFrames {
+      forall k in 1..numFrames {
         var l = 0;
         // Strand 1
         var ringPtr = 1;
@@ -215,20 +215,17 @@ module CustomIO {
 
         // Strand 2
         if strandsType == 2 {
-          // Need to be careful with indexing here
-          ringPtr = (if isCircular then nbp else nbp) + 1; 
-
           // Re-calculate ringPtr for second strand
-          ringPtr = 1;
+          var ringPtr2 = 1;
           for i in 1..nbp {
-             if seq[i] == "A" || seq[i] == "G" then ringPtr += 9;
-             else ringPtr += 6;
+             if seq[i] == "A" || seq[i] == "G" then ringPtr2 += 9;
+             else ringPtr2 += 6;
           }
           // Now at start of strand 2
           if !isCircular {
              for i in 1..2 {
-               if seq[nbp+i] == "A" || seq[nbp+i] == "G" then ringPtr += 9;
-               else ringPtr += 6;
+               if seq[nbp+i] == "A" || seq[nbp+i] == "G" then ringPtr2 += 9;
+               else ringPtr2 += 6;
              }
           }
           for i in startBp..endBp {
@@ -237,9 +234,9 @@ module CustomIO {
             var atomsInBase = if isPurine then 9 else 6;
             for 1..atomsInBase {
               l += 1;
-              var atomIdx = ringIndices[ringPtr];
+              var atomIdx = ringIndices[ringPtr2];
               filteredCoords[1..3, l, k] = framesList[k][1..3, atomIdx];
-              ringPtr += 1;
+              ringPtr2 += 1;
             }
           }
         }
@@ -260,33 +257,42 @@ module CustomIO {
    */
   proc coordinatesOther(path: string, nAtoms: int) {
     try! {
-      var f = open(path, ioMode.r);
-      var reader = f.reader();
-      var framesList: list([1..3, 1..nAtoms] real);
-      
+      // First pass: count frames
+      var f1 = open(path, ioMode.r);
+      var r1 = f1.reader();
       var isXyz = path.endsWith(".xyz");
-
+      var numFrames = 0;
       try {
         while true {
           if isXyz {
-            reader.read(int); // Skip num atoms
-            reader.readLine(); // Skip comment
+            r1.read(int);
+            r1.readLine();
           }
-          var frame: [1..3, 1..nAtoms] real;
-          for i in 1..nAtoms {
-            if isXyz then reader.read(string); // Skip atom name
-            for j in 1..3 do frame[j, i] = reader.read(real);
+          for 1..nAtoms {
+            if isXyz then r1.read(string);
+            for 1..3 do r1.read(real);
           }
-          framesList.pushBack(frame);
+          numFrames += 1;
         }
       } catch { }
+      f1.close();
 
-      f.close();
-      
-      var numFrames = framesList.size;
+      // Second pass: read directly into array
       var coords: [1..3, 1..nAtoms, 1..numFrames] real;
-      for k in 1..numFrames do coords[1..3, 1..nAtoms, k] = framesList[k-1];
-      
+      var f2 = open(path, ioMode.r);
+      var r2 = f2.reader();
+      for k in 1..numFrames {
+        if isXyz {
+          r2.read(int);
+          r2.readLine();
+        }
+        for i in 1..nAtoms {
+          if isXyz then r2.read(string);
+          for j in 1..3 do coords[j, i, k] = r2.read(real);
+        }
+      }
+      f2.close();
+
       return (coords, numFrames);
     }
   }
@@ -384,14 +390,21 @@ module CustomIO {
       f.close();
       return (1:int, nbp, frames, strands, str, nBsp, seqI, seqII, BSP, ovBsp, 
               matrix(0, 0), array3D(0, 0, 0), // elasp
-              array3D(0, 0, 0), matrix(0, 0), array3D(0, 0, 0), array3D(0, 0, 0), // strucp, avstrp, ovStrucp, ovAvstrp
+              // strucp, avstrp, ovStrucp, ovAvstrp
+              array3D(0, 0, 0), matrix(0, 0), 
+              array3D(0, 0, 0), array3D(0, 0, 0),
               array3D(0, 0, 0), matrix(0, 0)); // BPP
     }
   }
 
   // Define placeholders for empty arrays to keep tuple size consistent
-    private proc matrix(d1: int, d2: int) { var A: [1..d1, 1..d2] real; return A; }
-    private proc array3D(d1: int, d2: int, d3: int) { 
+    private proc matrix(d1: int, d2: int) 
+    {
+      var A: [1..d1, 1..d2] real;
+      return A;
+    }
+    private proc array3D(d1: int, d2: int, d3: int) 
+    {
       var A: [1..d1, 1..d2, 1..d3] real;
       return A;
     }
@@ -435,7 +448,9 @@ module CustomIO {
       return (2:int, nbp, frames, strands, str, nBsp, seqI, seqII, 
               array3D(0, 0, 0), array3D(0, 0, 0), // BSP
               elasp, ovElasp, 
-              array3D(0, 0, 0), matrix(0, 0), array3D(0, 0, 0), array3D(0, 0, 0), // strucp, avstrp, ovStrucp, ovAvstrp
+              // strucp, avstrp, ovStrucp, ovAvstrp
+              array3D(0, 0, 0), matrix(0, 0),
+              array3D(0, 0, 0), array3D(0, 0, 0),
               array3D(0, 0, 0), matrix(0, 0)); // BPP
     }
   }
@@ -521,13 +536,15 @@ module CustomIO {
       return (4:int, nbp, frames, strands, str, nBsp, seqI, seqII, 
               array3D(0, 0, 0), array3D(0, 0, 0), // BSP
               matrix(0, 0), array3D(0, 0, 0), // elasp
-              array3D(0, 0, 0), matrix(0, 0), array3D(0, 0, 0), array3D(0, 0, 0), // strucp, avstrp, ovStrucp, ovAvstrp
+              // strucp, avstrp, ovStrucp, ovAvstrp
+              array3D(0, 0, 0), matrix(0, 0),
+              array3D(0, 0, 0), array3D(0, 0, 0),
               BPP, ovBpp);
     }
   }
 
   /* Write BPP parameters to file */
-  proc writeBPP(BPP: [] real, ovBpp: [] real, seq: [] string, nbp: int,
+  proc writeBPP(ref BPP: [] real, ref ovBpp: [] real, seq: [] string, nbp: int,
                  numFrames: int, strandsType: int, isCircular: bool) {
     try! {
       var f = open("BPP.out", ioMode.cw);
@@ -580,7 +597,7 @@ module CustomIO {
   }
 
   /* Write BSP parameters to file */
-  proc writeBSP(BSP: [] real, ovBsp: [] real, seq: [] string, nbp: int, 
+  proc writeBSP(ref BSP: [] real, ref ovBsp: [] real, seq: [] string, nbp: int, 
                 numFrames: int, strandsType: int, isCircular: bool) {
     try! {
       var f = open("BSP.out", ioMode.cw);
@@ -633,8 +650,8 @@ module CustomIO {
   }
 
   /* Write structural parameters to file */
-  proc writeStructural(strucp: [] real, ovStrucp: [] real, avstrp: [] real, 
-                       ovAvstrp: [] real, seq: [] string, nbp: int, 
+  proc writeStructural(ref strucp: [] real, ref ovStrucp: [] real, ref avstrp: [] real, 
+                       ref ovAvstrp: [] real, seq: [] string, nbp: int, 
                        numFrames: int, strandsType: int, isCircular: bool) {
     try! {
       var f = open("structural.out", ioMode.cw);
@@ -694,7 +711,7 @@ module CustomIO {
   }
 
   /* Write elastic parameters to file */
-  proc writeElasticParms(elasp: [] real, ovElasp: [] real, seq: [] string,
+  proc writeElasticParms(ref elasp: [] real, ref ovElasp: [] real, seq: [] string,
                           nbp: int, numFrames: int, strandsType: int,
                           isCircular: bool) {
     try! {

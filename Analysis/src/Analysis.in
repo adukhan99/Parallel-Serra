@@ -1,0 +1,32 @@
+# Config file for Analysis
+# Lines beginning with '#' or 'c' are treated as comments.
+# Format:  key = value
+# Any key not listed here will use the compiled-in default.
+# CLI flags (--key=value) always take precedence over this file.
+# -------------------------------------------------------------------
+
+# Elastic parameters file produced by SerraNA (default: elastic.out)
+elasFile = elastic.out
+
+# Structural parameters file produced by SerraNA (default: structural.out)
+strucFile = structural.out
+
+# Persistence length ranges
+# Subfragment [rA_a..rA_b]: 0,0 = whole fragment
+# Sublength   [rA_l1..rA_l2]: 0,0 = default methodology (see manual)
+rA_a  = 0
+rA_b  = 0
+rA_l1 = 0
+rA_l2 = 0
+
+# Twist ranges
+rT_a  = 0
+rT_b  = 0
+rT_l1 = 0
+rT_l2 = 0
+
+# Stretch ranges
+rS_a  = 0
+rS_b  = 0
+rS_l1 = 0
+rS_l2 = 0

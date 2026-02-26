@@ -1,0 +1,21 @@
+# Config file for Extract
+# Lines beginning with '#' or 'c' are treated as comments.
+# Format:  key = value
+# Any key not listed here will use the compiled-in default.
+# CLI flags (--key=value) always take precedence over this file.
+# -------------------------------------------------------------------
+
+# Input parameter file (BSP.out, elastic.out, structural.out, or BPP.out)
+fileIn = elastic.out
+
+# Extraction type: 0 = sublength, 1 = subfragment overall (default: 0)
+typeExt = 0
+
+# Sublength to extract (only used when typeExt = 0; mer = sublength+1 bp)
+sublength = 1
+
+# Subfragment start base (only used when typeExt = 1; 0 = whole fragment)
+a = 0
+
+# Subfragment end base (only used when typeExt = 1; 0 = whole fragment)
+b = 0

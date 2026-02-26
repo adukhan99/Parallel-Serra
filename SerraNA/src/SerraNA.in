@@ -1,0 +1,18 @@
+# Config file for SerraNA
+# Lines beginning with '#' or 'c' are treated as comments.
+# Format:  key = value
+# Any key not listed here will use the compiled-in default.
+# CLI flags (--key=value) always take precedence over this file.
+# -------------------------------------------------------------------
+
+# Topology file (AMBER .prmtop format)
+top = my_dna.prmtop
+
+# Trajectory file (AMBER .crd format)
+traj = my_dna.crd
+
+# Strand type: 1 = single-stranded, 2 = double-stranded (default: 2)
+strandsType = 2
+
+# Structure type: 1 = linear, 2 = circular (default: 1)
+structType = 1

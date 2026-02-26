@@ -12,12 +12,40 @@ module SerraNA {
   use Math;
   use LinearAlgebra;
   use IO;
+  use Map;
 
-  config const top: string = "";
-  config const traj: string = "";
+  config var configFile: string = "";
+  config var top: string = "";
+  config var traj: string = "";
   // 1 for single-stranded, 2 for double-stranded
-  config const strandsType: int = 2;
-  config const structType: int = 1;  // 1 for linear, 2 for circular
+  config var strandsType: int = 2;
+  config var structType: int = 1;  // 1 for linear, 2 for circular
+
+  /*
+   * Parse a simple key = value config file.
+   * Lines beginning with 'c' or '#' are treated as comments.
+   * Returns a map of key -> value strings.
+   */
+  proc parseConfigFile(path: string) {
+    var cfg: map(string, string);
+    try! {
+      var f = open(path, ioMode.r);
+      var reader = f.reader();
+      var line: string;
+      while reader.readLine(line) {
+        line = line.strip();
+        if line == "" then continue;
+        if line[0] == "c" || line[0] == "#" then continue;
+        var eqIdx = line.find("="):int;
+        if eqIdx == -1 then continue;
+        var k = line[0..eqIdx-1].strip();
+        var v = line[eqIdx+1..].strip();
+        cfg.add(k, v);
+      }
+      f.close();
+    }
+    return cfg;
+  }
 
   proc elasticF(IV: [1..4, 1..4] real, N: int) {
     var elastic_F: [1..10] real;
@@ -36,46 +64,57 @@ module SerraNA {
 
   proc main() {
     try! {
-    if top == "" || traj == "" {
+    // Load config file values as defaults (CLI flags override them).
+    var cfgTop = top;
+    var cfgTraj = traj;
+    var cfgStrandsType = strandsType;
+    var cfgStructType = structType;
+
+    if configFile != "" {
+      var cfg = parseConfigFile(configFile);
+      if top == "" && cfg.contains("top") then cfgTop = try! cfg["top"];
+      if traj == "" && cfg.contains("traj") then cfgTraj = try! cfg["traj"];
+      if strandsType == 2 && cfg.contains("strandsType") then
+        cfgStrandsType = try! cfg["strandsType"]:int;
+      if structType == 1 && cfg.contains("structType") then
+        cfgStructType = try! cfg["structType"]:int;
+    }
+
+    if cfgTop == "" || cfgTraj == "" {
       writeln(
         "Topology and trajectory files must be specified using " +
-        "--top=<file> and --traj=<file>");
+        "--top=<file> and --traj=<file>, or via --configFile=<file>");
       return;
     }
 
-    if strandsType == 1 then writeln("Single stranded structure");
-    else if strandsType == 2 then writeln("Double stranded structure");
+    if cfgStrandsType == 1 then writeln("Single stranded structure");
+    else if cfgStrandsType == 2 then writeln("Double stranded structure");
     else 
       halt("Tell me if it is a single or double stranded structure (1 or 2)");
 
-    if structType == 1 then writeln("Linear structure");
-    else if structType == 2 then writeln("Circular structure");
+    if cfgStructType == 1 then writeln("Linear structure");
+    else if cfgStructType == 2 then writeln("Circular structure");
     else 
       halt("Tell me if it is a circular or linear structure (1 or 2)");
 
-    writeln("Topology file = ", top);
-    writeln("Trajectory file = ", traj);
+    writeln("Topology file = ", cfgTop);
+    writeln("Trajectory file = ", cfgTraj);
 
     writeln("Reading topology file");
     var (origNbp, nAtoms, box, origSeq, ringIndices) =
-      topologyAmber(top, strandsType);
+      topologyAmber(cfgTop, cfgStrandsType);
 
     writeln("Reading trajectory file");
-    var isCircular = (structType == 2);
+    var isCircular = (cfgStructType == 2);
     var (coords, frames, nbp, seq) =
       coordinatesAmberCrd(
-        traj, nAtoms, origNbp, box, strandsType, isCircular,
+        cfgTraj, nAtoms, origNbp, box, cfgStrandsType, isCircular,
         ringIndices, origSeq);
 
     writeln("Calculating structural parameters");
-    var nb = strandsType * nbp;
+    var nb = cfgStrandsType * nbp;
     var n_bsp =
-      if structType == 2 then nbp * (nbp - 1) else nbp * (nbp - 1) / 2;
-
-    var R: [1..3, 1..3, 1..nb] real;
-    var O: [1..3, 1..nb] real;
-    var Rmbt: [1..3, 1..3, 1..nbp] real;
-    var Ombt: [1..3, 1..nbp] real;
+      if cfgStructType == 2 then nbp * (nbp - 1) else nbp * (nbp - 1) / 2;
 
     var BSP: [1..9, 1..n_bsp, 1..frames] real;
     var BPP: [1..6, 1..nbp, 1..frames] real;
@@ -90,7 +129,7 @@ module SerraNA {
 
     var i_case = 0;
 
-    select (structType, strandsType) {
+    select (cfgStructType, cfgStrandsType) {
       when (1, 2) do i_case = 1;
       when (1, 1) do i_case = 2;
       when (2, 2) do i_case = 3;
@@ -98,7 +137,11 @@ module SerraNA {
       otherwise do halt("Error in determining case");
     }
 
-    for k in 1..frames {
+    forall k in 1..frames {
+      var R: [1..3, 1..3, 1..nb] real;
+      var O: [1..3, 1..nb] real;
+      var Rmbt: [1..3, 1..3, 1..nbp] real;
+      var Ombt: [1..3, 1..nbp] real;
       var l = 1;
       for i in 1..nb {
         var nAuth: int;
@@ -106,22 +149,14 @@ module SerraNA {
         else nAuth = n_Y;
 
         var Ex: [1..3, 1..nAuth] real = coords[1..3, l..l+nAuth-1, k];
-        var R_O: ( [1..3, 1..3] real, [1..3] real );
-
-        select seq[i] {
-          when "G" do R_O = getRotationROriginO(Ex, G_b);
-          when "A" do R_O = getRotationROriginO(Ex, A_b);
-          when "C" do R_O = getRotationROriginO(Ex, C_b);
-          when "T" do R_O = getRotationROriginO(Ex, T_b);
-          when "U" do R_O = getRotationROriginO(Ex, U_b);
-        }
+        var R_O = getRotationROriginO(Ex, if nAuth == n_R then (if seq[i] == "G" then G_b else A_b) else (if seq[i] == "C" then C_b else (if seq[i] == "T" then T_b else U_b)));
 
         R[1..3, 1..3, i] = R_O(0);
         O[1..3, i] = R_O(1);
         l += nAuth;
       }
 
-      if strandsType == 2 {
+      if cfgStrandsType == 2 {
         for i in nbp+1..nb {
           R[1..3, 2, i] = -R[1..3, 2, i];
           R[1..3, 3, i] = -R[1..3, 3, i];
@@ -345,9 +380,11 @@ module SerraNA {
     if frames > 1 {
       writeln("Calculating elastic parameters");
       for j in 1..nbp-1 {
-        var w =
-          if structType == 2 then (if j < nbp - j then j else nbp - j) else j;
-        var limit = if structType == 2 then nbp else nbp - j;
+        var isCircStrW = (cfgStructType == 2);
+        var w = if isCircStrW
+                then (if j < nbp - j then j else nbp - j)
+                else j;
+        var limit = if cfgStructType == 2 then nbp else nbp - j;
         for l in 1..limit {
           V[1..4, 1..4, l] = deformationCovariance(
                                BSP[5, l, 1..frames],  // Roll
@@ -373,8 +410,8 @@ module SerraNA {
     var avstd_C_l: [1..2, 1..n_bsp] real;
     var avstd_added: [1..2, 1..3, 1..n_bsp] real;
 
-    if strandsType == 2 {
-      for i in 1..nbp {
+    if cfgStrandsType == 2 {
+      forall i in 1..nbp {
         for j in 1..6 {
           var res = averageStd(BPP[j, i, 1..frames]);
           avstd_BPP[1, j, i] = res[1];
@@ -383,7 +420,7 @@ module SerraNA {
       }
     }
 
-    for i in 1..n_bsp {
+    forall i in 1..n_bsp {
       for j in 1..9 {
         var res = averageStd(BSP[j, i, 1..frames]);
         avstd_BSP[1, j, i] = res[1];
@@ -413,7 +450,7 @@ module SerraNA {
 
     var bspIdx = 0;
     var t_twist = 0.0;
-    if structType != 2 {
+    if cfgStructType != 2 {
       for i in 1..nbp-1 {
         bspIdx += 1;
         var res =
@@ -505,7 +542,7 @@ module SerraNA {
 
     var idxL = 1;
     for j in 1..nbp-1 {
-      var limit = if structType == 2 then nbp else nbp - j;
+      var limit = if cfgStructType == 2 then nbp else nbp - j;
       for i in 1..9 {
         var res = averageStd(avstd_BSP[1, i, idxL..idxL+limit-1]);
         OV_BSP[1, i, j] = res[1];
@@ -528,7 +565,7 @@ module SerraNA {
     if frames > 1 {
       idxL = 1;
       for j in 1..nbp-1 {
-        var limit = if structType == 2 then nbp else nbp - j;
+        var limit = if cfgStructType == 2 then nbp else nbp - j;
         var resV = averageStd(V[4, 4, idxL..idxL+limit-1]);
         OV_V_E_E[1, j] = resV[1];
         OV_V_E_E[2, j] = resV[2];
@@ -553,7 +590,7 @@ module SerraNA {
 
     idxL = 1;
     for j in 1..nbp-1 {
-      var limit = if structType == 2 then nbp else nbp - j;
+      var limit = if cfgStructType == 2 then nbp else nbp - j;
       for i in 1..9 {
         var res = averageStd(avstr_BSP[i, idxL..idxL+limit-1]);
         OV_BSP_avstr[1, i, j] = res[1];
@@ -563,12 +600,14 @@ module SerraNA {
     }
 
     writeln("Writing output files");
-    if strandsType == 2 {
+    if cfgStrandsType == 2 {
       writeBPP(
-        avstd_BPP, OV_BPP, seq, nbp, frames, strandsType, structType==2);
+        avstd_BPP, OV_BPP, seq, nbp, frames,
+        cfgStrandsType, cfgStructType==2);
     }
     writeBSP(
-      avstd_BSP, OV_BSP, seq, nbp, frames, strandsType, structType==2);
+      avstd_BSP, OV_BSP, seq, nbp, frames,
+      cfgStrandsType, cfgStructType==2);
 
     // Build strucp [1..2, 1..11, 1..n_bsp]:
     //   params 1..9  = averaged base-step parameters (Shift..Bending²)
@@ -610,7 +649,7 @@ module SerraNA {
         ovAvstrp[1, i, j] = OV_BSP_avstr[1, i, j];
     writeStructural(
       strucp, ovStrucp, avstrp, ovAvstrp, seq, nbp, frames,
-      strandsType, structType==2);
+      cfgStrandsType, cfgStructType==2);
 
     if frames > 1 {
       var elasp: [1..13, 1..n_bsp] real;
@@ -620,7 +659,8 @@ module SerraNA {
       }
       var ovElasp: [1..2, 1..13, 1..nbp-1] real;
       writeElasticParms(
-        elasp, ovElasp, seq, nbp, frames, strandsType, structType==2);
+        elasp, ovElasp, seq, nbp, frames,
+        cfgStrandsType, cfgStructType==2);
     }
     }
   }
