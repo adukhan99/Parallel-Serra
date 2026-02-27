@@ -221,8 +221,12 @@ module Functions {
   /* Matrix inversion for 3x3 matrix (tuple-based) */
   inline proc mat3Inversion(A: mat3): mat3 {
     var det_A = 
-      A(0)(0)*A(1)(1)*A(2)(2) + A(0)(1)*A(1)(2)*A(2)(0) + A(0)(2)*A(1)(0)*A(2)(1) 
-      - A(2)(0)*A(1)(1)*A(0)(2) - A(2)(1)*A(1)(2)*A(0)(0) - A(2)(2)*A(1)(0)*A(0)(1);
+      A(0)(0)*A(1)(1)*A(2)(2) +
+      A(0)(1)*A(1)(2)*A(2)(0) +
+      A(0)(2)*A(1)(0)*A(2)(1) -
+      A(2)(0)*A(1)(1)*A(0)(2) -
+      A(2)(1)*A(1)(2)*A(0)(0) -
+      A(2)(2)*A(1)(0)*A(0)(1);
 
     if abs(det_A) < eps then halt("0 determinant of matrix A");
 
@@ -243,7 +247,7 @@ module Functions {
             (inv(2)(0) * detInv, inv(2)(1) * detInv, inv(2)(2) * detInv));
   }
 
-  /* Matrix inversion for 3x3 matrix (array-based, delegates to mat3Inversion) */
+  /* Matrix inversion for 3x3 matrix */
   proc matrixInversion3X3(A: [1..3, 1..3] real) {
     var tA: mat3 = ((A[1,1], A[1,2], A[1,3]),
                     (A[2,1], A[2,2], A[2,3]),
@@ -522,10 +526,10 @@ module Functions {
     // Scale C
     for i in 0..2 do C(i) = vec3Scale(C(i), N_1_inv);
 
-    var M = mat3ToMat4_M(C);
+    var M = mat3ToMat4M(C);
     var (S, V) = diagonalizationJacobi4(M);
     var q = largestEigenvec4(S, V);
-    var tR = getRotationR_tuple(q);
+    var tR = getRotationRTuple(q);
     
     var R: [1..3, 1..3] real;
     for i in 0..2 do
@@ -539,7 +543,7 @@ module Functions {
   }
 
   /* Real symmetric matrix M from 3x3 matrix C (tuple-based) */
-  inline proc mat3ToMat4_M(C: mat3): mat4 {
+  inline proc mat3ToMat4M(C: mat3): mat4 {
     var M: mat4;
     M(0) = (C(0)(0) + C(1)(1) + C(2)(2),
             C(1)(2) - C(2)(1),
@@ -565,7 +569,7 @@ module Functions {
     var tC: mat3 = ((C[1,1], C[1,2], C[1,3]),
                     (C[2,1], C[2,2], C[2,3]),
                     (C[3,1], C[3,2], C[3,3]));
-    var res = mat3ToMat4_M(tC);
+    var res = mat3ToMat4M(tC);
     var M: [1..4, 1..4] real;
     for i in 1..4 do
       for j in 1..4 do
@@ -573,7 +577,7 @@ module Functions {
     return M;
   }
 
-  /* Largest eigenvector of matrix M from diagonalization results S and V (tuple-based) */
+  /* Largest eigenvector of matrix M from diagonalization results S and V */
   inline proc largestEigenvec4(S: mat4, V: mat4): vec4 {
     var larg = eps;
     var j = 0;
@@ -590,7 +594,7 @@ module Functions {
   }
 
   /* Rotation matrix R from eigenvector q (tuple-based) */
-  inline proc getRotationR_tuple(q: vec4): mat3 {
+  inline proc getRotationRTuple(q: vec4): mat3 {
     var R: mat3;
     R(0) = (q(0)**2 + q(1)**2 - q(2)**2 - q(3)**2,
             2.0 * (q(1)*q(2) - q(0)*q(3)),
@@ -607,7 +611,7 @@ module Functions {
   /* Rotation matrix R from eigenvector q (array-based) */
   proc getRotationR(q: [1..4] real) {
     var tq: vec4 = (q[1], q[2], q[3], q[4]);
-    var res = getRotationR_tuple(tq);
+    var res = getRotationRTuple(tq);
     var R: [1..3, 1..3] real;
     for i in 1..3 do
       for j in 1..3 do
@@ -733,12 +737,15 @@ module Functions {
     var T2 = mat3Mul(mat3Rotation(rt, -0.5 * BSP[7]), R2);
 
     // Tmst = 0.5 * (T1 + T2) then normalize columns
-    var col0 = vec3Normalize(vec3Scale(vec3Add(mkVec3(T1(0)(0), T1(1)(0), T1(2)(0)),
-                                              mkVec3(T2(0)(0), T2(1)(0), T2(2)(0))), 0.5));
-    var col1 = vec3Normalize(vec3Scale(vec3Add(mkVec3(T1(0)(1), T1(1)(1), T1(2)(1)),
-                                              mkVec3(T2(0)(1), T2(1)(1), T2(2)(1))), 0.5));
-    var col2 = vec3Normalize(vec3Scale(vec3Add(mkVec3(T1(0)(2), T1(1)(2), T1(2)(2)),
-                                              mkVec3(T2(0)(2), T2(1)(2), T2(2)(2))), 0.5));
+    var col0 = vec3Normalize(vec3Scale(
+      vec3Add(mkVec3(T1(0)(0), T1(1)(0), T1(2)(0)),
+              mkVec3(T2(0)(0), T2(1)(0), T2(2)(0))), 0.5));
+    var col1 = vec3Normalize(vec3Scale(
+      vec3Add(mkVec3(T1(0)(1), T1(1)(1), T1(2)(1)),
+              mkVec3(T2(0)(1), T2(1)(1), T2(2)(1))), 0.5));
+    var col2 = vec3Normalize(vec3Scale(
+      vec3Add(mkVec3(T1(0)(2), T1(1)(2), T1(2)(2)),
+              mkVec3(T2(0)(2), T2(1)(2), T2(2)(2))), 0.5));
 
     var T1_2 = mkVec3(T1(0)(1), T1(1)(1), T1(2)(1));
     var T2_2 = mkVec3(T2(0)(1), T2(1)(1), T2(2)(1));
@@ -1022,7 +1029,8 @@ module Functions {
           tLength: int) {
     var nbp = coords.dim(1).size;
     var numFrames = coords.dim(2).size;
-    var tangents: [1..3, 1..nbp, 1..numFrames] real;
+    var tangents_n = if circleStr then nbp else nbp - tLength;
+    var tangents: [1..3, 1..tangents_n, 1..numFrames] real;
     forall k in 1..numFrames {
       for i in 1..nbp-tLength {
         tangents[1..3, i, k] = 

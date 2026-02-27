@@ -155,13 +155,13 @@ module Analysis {
     var whole_Al = (rA[1, 2] == 0 && rA[2, 2] == 0);
     validateSubfrag(rA[1, 1], rA[2, 1], nbp, str, "Persistence length");
     validateSublen(rA[1, 2], rA[2, 2], rA[1, 1], rA[2, 1],
-                   nbp, str, "Persistence length");
+                   nbp, "Persistence length");
 
     var whole_Tf = (rT[1, 1] == 0 && rT[2, 1] == 0);
     var whole_Tl = (rT[1, 2] == 0 && rT[2, 2] == 0);
     validateSubfrag(rT[1, 1], rT[2, 1], nbp, str, "Twist");
     validateSublen(rT[1, 2], rT[2, 2], rT[1, 1], rT[2, 1],
-                   nbp, str, "Twist");
+                   nbp, "Twist");
 
     // Stretch subfragment: apply default midpoint selection when not given.
     var whole_Sf: bool;
@@ -183,7 +183,7 @@ module Analysis {
     if !whole_Sf then
       validateSubfrag(rS[1, 1], rS[2, 1], nbp, str, "Stretch");
     validateSublen(rS[1, 2], rS[2, 2], rS[1, 1], rS[2, 1],
-                   nbp, str, "Stretch");
+                   nbp, "Stretch");
 
     // -----------------------------------------------------------------------
     // COMPUTE AVERAGING VECTOR SIZES
@@ -417,8 +417,9 @@ module Analysis {
    */
   private inline proc rangeN(a: int, b: int, nbp: int): int {
     if a < b then return b - a;
-    else if b > a then return nbp + b - a;
-    else return nbp - 1; // a == b == 0: whole fragment
+    else if b < a then return nbp + b - a;
+    else 
+      return nbp - 1; // a == b == 0: whole fragment
   }
 
   /*

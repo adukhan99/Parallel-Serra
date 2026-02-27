@@ -149,7 +149,12 @@ module SerraNA {
         else nAuth = n_Y;
 
         var Ex: [1..3, 1..nAuth] real = coords[1..3, l..l+nAuth-1, k];
-        var R_O = getRotationROriginO(Ex, if nAuth == n_R then (if seq[i] == "G" then G_b else A_b) else (if seq[i] == "C" then C_b else (if seq[i] == "T" then T_b else U_b)));
+        var R_O = getRotationROriginO(Ex,
+          if nAuth == n_R then (
+            if seq[i] == "G" then G_b else A_b) 
+          else (
+            if seq[i] == "C" then C_b 
+            else (if seq[i] == "T" then T_b else U_b)));
 
         R[1..3, 1..3, i] = R_O(0);
         O[1..3, i] = R_O(1);
