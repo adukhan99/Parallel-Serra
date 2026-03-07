@@ -110,15 +110,53 @@ module Analysis {
     // -----------------------------------------------------------------------
     // READING SECTION
     // -----------------------------------------------------------------------
-    // Read elastic parameters from file.
-    var (_, enbp, eframes, _, estr, _, _, _,
-         _, _, elasp, ovElasp, _, _, _, _, _, _) =
-      readElasticParms(cfgElasFile);
+    var enbp, eframes, estr: int;
+    var elaspDom = {1..13, 1..0};
+    var elasp: [elaspDom] real;
+    var ovElaspDom = {1..2, 1..13, 1..0};
+    var ovElasp: [ovElaspDom] real;
 
-    // Read structural parameters from file.
-    var (_, _, _, _, _, _, _, _,
-         _, _, _, _, strucp, avstrp, ovStrucp, ovAvstrp, _, _) =
-      readStructuralParms(cfgStrucFile);
+    var strucpDom = {1..2, 1..11, 1..0};
+    var strucp: [strucpDom] real;
+    var avstrpDom = {1..3, 1..0};
+    var avstrp: [avstrpDom] real;
+    var ovStrucpDom = {1..2, 1..11, 1..0};
+    var ovStrucp: [ovStrucpDom] real;
+    var ovAvstrpDom = {1..2, 1..3, 1..0};
+    var ovAvstrp: [ovAvstrpDom] real;
+
+    coforall task in 1..2
+        with (ref enbp, ref eframes, ref estr,
+              ref elaspDom, ref elasp, ref ovElaspDom, ref ovElasp,
+              ref strucpDom, ref strucp, ref avstrpDom, ref avstrp,
+              ref ovStrucpDom, ref ovStrucp, ref ovAvstrpDom, ref ovAvstrp) {
+      if task == 1 {
+        // Read elastic parameters from file.
+        var (_, t_enbp, t_eframes, _, t_estr, _, _, _,
+             _, _, t_elasp, t_ovElasp, _, _, _, _, _, _) =
+          readElasticParms(cfgElasFile);
+        enbp = t_enbp;
+        eframes = t_eframes;
+        estr = t_estr;
+        elaspDom = t_elasp.domain;
+        elasp = t_elasp;
+        ovElaspDom = t_ovElasp.domain;
+        ovElasp = t_ovElasp;
+      } else {
+        // Read structural parameters from file.
+        var (_, _, _, _, _, _, _, _,
+             _, _, _, _, t_strucp, t_avstrp, t_ovStrucp, t_ovAvstrp, _, _) =
+          readStructuralParms(cfgStrucFile);
+        strucpDom = t_strucp.domain;
+        strucp = t_strucp;
+        avstrpDom = t_avstrp.domain;
+        avstrp = t_avstrp;
+        ovStrucpDom = t_ovStrucp.domain;
+        ovStrucp = t_ovStrucp;
+        ovAvstrpDom = t_ovAvstrp.domain;
+        ovAvstrp = t_ovAvstrp;
+      }
+    }
 
     var nbp    = enbp;
     var frames = eframes;
@@ -233,7 +271,7 @@ module Analysis {
     } else {
       var col: [1..elasp.dim(1).size] real;
       for i in 1..elasp.dim(1).size do col[i] = elasp[2, i];
-      av_twist = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
+      av_twist = centralFragment(col, rT[1, 1], rT[2, 1], nbp, str);
     }
 
     // Partial variance of end-to-end distance: elastic param index 13
@@ -415,7 +453,7 @@ module Analysis {
    * Size of the averaging vector for a subfragment [a, b] over nbp base-pairs.
    * Mirrors Analysis.f90's A_n / T_n / S_n calculation.
    */
-  private inline proc rangeN(a: int, b: int, nbp: int): int {
+  private proc rangeN(a: int, b: int, nbp: int): int {
     if a < b then return b - a;
     else if b < a then return nbp + b - a;
     else 
@@ -426,7 +464,7 @@ module Analysis {
    * Validate a subfragment selection [a, b] against nbp.
    * Halts with a descriptive message if invalid.
    */
-  private inline proc validateSubfrag(a: int, b: int, nbp: int,
+  private proc validateSubfrag(a: int, b: int, nbp: int,
                                 str: int, name: string) {
     if a == b && b != 0 && a != 0 then
       halt("Invalid subfragment selection for " + name);
@@ -444,8 +482,8 @@ module Analysis {
    * Validate a sublength selection [l1, l2] for a given quantity.
    * Also validates that [l1,l2] fits inside the subfragment [a, b].
    */
-  private inline proc validateSublen(l1: int, l2: int, a: int, b: int,
-                               nbp: int, str: int, name: string) {
+  private proc validateSublen(l1: int, l2: int, a: int, b: int,
+                               nbp: int, name: string) {
     if l1 == l2 && l1 != 0 && l2 != 0 then
       halt("Invalid sublength selection for " + name);
     if l1 < 1 && l2 != 0 then

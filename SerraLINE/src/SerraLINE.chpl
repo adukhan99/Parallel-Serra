@@ -51,7 +51,7 @@ module SerraLINE {
     return cfg;
   }
 
-  proc writeAvParms(nbp: int, ndim: int, frames: int, ref seq: [] string,
+  proc writeAvParms(nbp: int, nldim: int, frames: int, ref seq: [] string,
                     ref avstd_bends: [] real, ref avstd_width: [] real,
                     ref avstd_height: [] real, ref avstd_aratio: [] real,
                     t_length: int, ref avg_dist: [] real, ref max_dist: [] real,
@@ -66,57 +66,39 @@ module SerraLINE {
       writer.write("SEQUENCE\n");
       for s in seq do writer.write(s);
       writer.writeln();
-      writer.writef(F_PARM_5, "SNAPSHOTS ANALYSED", frames);
-      writer.writeln();
-      writer.writef(F_PARM_5, "TANGENT LENGTH:", t_length);
+      writer.writeln("SNAPSHOTS ANALYSED    ", frames);
+      writer.writeln("TANGENT LENGTH:       ", t_length);
       writer.writeln();
       writer.writeln(
         "First column averages, second column standard deviations");
-      writer.writef(
-        F_PARM_6, "WIDTH (Angstroms): ", avstd_width[1], avstd_width[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6, "HEIGHT (Angstroms): ", avstd_height[1], avstd_height[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6, "ASPECT RATIO:", avstd_aratio[1], avstd_aratio[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6,
-        "AVERAGE OF DISTANCES TO PLANE (Angstroms):",
-        avg_dist[1], avg_dist[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6,
-        "AVERAGE OF MAXIMUM DISTANCES TO PLANE (Angstroms):",
-        max_dist[1], max_dist[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6,
-        "RELATIVE AVERAGE OF DISTANCES TO PLANE (%):",
-        avg_dist_rel[1], avg_dist_rel[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6,
-        "RELATIVE AVERAGE OF MAXIMUM DISTANCES TO PLANE (%):",
-        max_dist_rel[1], max_dist_rel[2]);
+      writer.writeln("WIDTH (Angstroms): ",
+                     avstd_width[1], " ", avstd_width[2]);
+      writer.writeln("HEIGHT (Angstroms): ",
+                     avstd_height[1], " ", avstd_height[2]);
+      writer.writeln("ASPECT RATIO: ",
+                     avstd_aratio[1], " ", avstd_aratio[2]);
+      writer.writeln("AVERAGE OF DISTANCES TO PLANE (Angstroms): ",
+                     avg_dist[1], " ", avg_dist[2]);
+      writer.writeln("AVERAGE OF MAXIMUM DISTANCES TO PLANE (Angstroms): ",
+                     max_dist[1], " ", max_dist[2]);
+      writer.writeln("RELATIVE AVERAGE OF DISTANCES TO PLANE (percent): ",
+                     avg_dist_rel[1], " ", avg_dist_rel[2]);
+      writer.writeln(
+        "RELATIVE AVERAGE OF MAXIMUM DISTANCES TO PLANE (percent): ",
+        max_dist_rel[1], " ", max_dist_rel[2]);
       writer.writeln("\n");
       var l = 0;
-      for j in 1..ndim-1 {
-        writer.writef(F_PARM_3, j+1, "mer");
-        writer.writeln();
-        writer.writef(F_PARM_1, "base-step", "Bending angle");
-        writer.writeln();
+      for j in 1..nldim-1 {
+        writer.writeln(j+1, "mer");
+        writer.writeln("base-step", " ", "Bending angle");
         writer.writeln("-" * 38);
-        var endLimit = ndim - j;
+        var endLimit = nldim - j;
         if endLimit >= 1 {
           for i in 1..endLimit {
             l += 1;
-            writer.writef(
-              F_PARM_2, i, "-", i+j, " ", " ",
-              seq[i], seq[i+j], " ", " ",
-              avstd_bends[1, l], avstd_bends[2, l]);
-            writer.writeln();
+            writer.writeln(i, "-", i+j, " ",
+                           seq[i], " ", seq[i+j], " ",
+                           avstd_bends[1, l], " ", avstd_bends[2, l]);
           }
         }
         writer.writeln();
@@ -144,55 +126,37 @@ module SerraLINE {
       writer.write("SEQUENCE\n");
       for s in seq do writer.write(s);
       writer.writeln();
-      writer.writef(F_PARM_5, "SNAPSHOTS ANALYSED", frames);
-      writer.writeln();
-      writer.writef(F_PARM_5, "TANGENT LENGTH:", t_length);
+      writer.writeln("SNAPSHOTS ANALYSED    ", frames);
+      writer.writeln("TANGENT LENGTH:       ", t_length);
       writer.writeln();
       writer.writeln(
         "First column averages, second column standard deviations");
-      writer.writef(
-        F_PARM_6, "WIDTH (Angstroms): ", avstd_width[1], avstd_width[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6, "HEIGHT (Angstroms): ", avstd_height[1], avstd_height[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6, "ASPECT RATIO:", avstd_aratio[1], avstd_aratio[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6,
-        "AVERAGE OF DISTANCES TO PLANE (Angstroms):",
-        avg_dist[1], avg_dist[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6,
-        "AVERAGE OF MAXIMUM DISTANCES TO PLANE (Angstroms):",
-        max_dist[1], max_dist[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6,
-        "RELATIVE AVERAGE OF DISTANCES TO PLANE (%):",
-        avg_dist_rel[1], avg_dist_rel[2]);
-      writer.writeln();
-      writer.writef(
-        F_PARM_6,
-        "RELATIVE AVERAGE OF MAXIMUM DISTANCES TO PLANE (%):",
-        max_dist_rel[1], max_dist_rel[2]);
+      writer.writeln("WIDTH (Angstroms): ",
+                     avstd_width[1], " ", avstd_width[2]);
+      writer.writeln("HEIGHT (Angstroms): ",
+                     avstd_height[1], " ", avstd_height[2]);
+      writer.writeln("ASPECT RATIO: ",
+                     avstd_aratio[1], " ", avstd_aratio[2]);
+      writer.writeln("AVERAGE OF DISTANCES TO PLANE (Angstroms): ",
+                     avg_dist[1], " ", avg_dist[2]);
+      writer.writeln("AVERAGE OF MAXIMUM DISTANCES TO PLANE (Angstroms): ",
+                     max_dist[1], " ", max_dist[2]);
+      writer.writeln("RELATIVE AVERAGE OF DISTANCES TO PLANE (percent): ",
+                     avg_dist_rel[1], " ", avg_dist_rel[2]);
+      writer.writeln(
+        "RELATIVE AVERAGE OF MAXIMUM DISTANCES TO PLANE (percent): ",
+        max_dist_rel[1], " ", max_dist_rel[2]);
       writer.writeln("\n");
       for l in 1..nbp-1 {
-        writer.writef(F_PARM_3, l+1, "mer");
-        writer.writeln();
-        writer.writef(F_PARM_1, "base-step", "Bending angle");
-        writer.writeln();
+        writer.writeln(l+1, "mer");
+        writer.writeln("base-step", " ", "Bending angle");
         writer.writeln("-" * 38);
         for i in 1..nbp {
           var s = i + l;
           if s > nbp then s = s - nbp;
-          writer.writef(
-            F_PARM_2, i, "-", s, " ", " ",
-            c_seq[i], c_seq[s], " ", " ",
-            avstd_bends[1, i, l], avstd_bends[2, i, l]);
-          writer.writeln();
+          writer.writeln(i, "-", s, " ",
+                         c_seq[i], " ", c_seq[s], " ",
+                         avstd_bends[1, i, l], " ", avstd_bends[2, i, l]);
         }
         writer.writeln();
       }
@@ -200,43 +164,41 @@ module SerraLINE {
     }
   }
 
-  proc writeAvBends(nbp: int, ndim: int, frames: int, ref seq: [] string,
+  proc writeAvBends(nbp: int, nldim: int, frames: int, ref seq: [] string,
                     ref avstd_bends: [] real, t_length: int) {
     try! {
       var f = open("SerraLINE.out", ioMode.cw);
       var writer = f.writer();
-      writer.writeln("PARAMETERS\n");
-      writer.writeln("OPENED STRUCTURE");
-      writer.writeln("METHOD: WITHOUT PROJECTION");
-      writer.writeln("BASE PAIRS ", nbp);
-      writer.write("SEQUENCE\n");
+      writer.writeln(" PARAMETERS");
+      writer.writeln(" ");
+      writer.writeln(" OPENED STRUCTURE");
+      writer.writeln(" METHOD: WITHOUT PROJECTION");
+      writer.writef(" BASE PAIRS %12i\n", nbp);
+      writer.writeln(" SEQUENCE");
+      writer.write(" ");
       for s in seq do writer.write(s);
       writer.writeln();
-      writer.writef(F_PARM_5, "SNAPSHOTS ANALYSED", frames);
-      writer.writeln();
-      writer.writef(F_PARM_5, "TANGENT LENGTH:", t_length);
-      writer.writeln();
+      writer.writef("  SNAPSHOTS ANALYSED%10i\n", frames);
+      writer.writef("     TANGENT LENGTH:%10i\n", t_length);
+      writer.writeln(" ");
       writer.writeln(
-        "First column averages, second column standard deviations\n");
+        " First column averages, second column standard deviations");
       var l = 0;
-      for j in 1..ndim-1 {
-        writer.writef(F_AVB_3, j+1, "mer");
-        writer.writeln();
-        writer.writef(F_AVB_1, "base-step", "Bending angle");
-        writer.writeln();
-        writer.writeln("-" * 38);
-        var endLimit = ndim - j;
+      for j in 1..nldim-1 {
+        writer.writef("%10i", j);
+        writer.writeln("        bp");
+        writer.writeln("           base-step       Bending angle");
+        writer.writeln(" " + "-" * 38);
+        var endLimit = nldim - j;
         if endLimit >= 1 {
           for i in 1..endLimit {
             l += 1;
-            writer.writef(
-              F_AVB_2, i, "-", i+j, " ", " ",
-              seq[i], seq[i+j], " ", " ",
-              avstd_bends[1, l], avstd_bends[2, l]);
-            writer.writeln();
+            writer.writef("%4i-%4i  %s%s  %10.3dr%10.3dr\n",
+                          i, i+j, seq[i], seq[i+j],
+                          avstd_bends[1, l], avstd_bends[2, l]);
           }
         }
-        writer.writeln();
+        writer.writeln(" ");
       }
       writer.close();
     }
@@ -257,26 +219,21 @@ module SerraLINE {
       writer.write("SEQUENCE\n");
       for s in seq do writer.write(s);
       writer.writeln();
-      writer.writef(F_PARM_5, "SNAPSHOTS ANALYSED", frames);
-      writer.writeln();
-      writer.writef(F_PARM_5, "TANGENT LENGTH:", t_length);
+      writer.writeln("SNAPSHOTS ANALYSED    ", frames);
+      writer.writeln("TANGENT LENGTH:       ", t_length);
       writer.writeln();
       writer.writeln(
         "First column averages, second column standard deviations\n");
       for l in 1..nbp-1 {
-        writer.writef(F_AVB_3, l+1, "mer");
-        writer.writeln();
-        writer.writef(F_AVB_1, "base-step", "Bending angle");
-        writer.writeln();
+        writer.writeln(l+1, "mer");
+        writer.writeln("base-step", " ", "Bending angle");
         writer.writeln("-" * 38);
         for i in 1..nbp {
           var s = i + l;
           if s > nbp then s = s - nbp;
-          writer.writef(
-            F_AVB_2, i, "-", s, " ", " ",
-            c_seq[i], c_seq[s], " ", " ",
-            avstd_bends[1, i, l], avstd_bends[2, i, l]);
-          writer.writeln();
+          writer.writeln(i, "-", s, " ",
+                         c_seq[i], " ", c_seq[s], " ",
+                         avstd_bends[1, i, l], " ", avstd_bends[2, i, l]);
         }
         writer.writeln();
       }
@@ -345,13 +302,14 @@ module SerraLINE {
         topologyAmber(cfgTop, cfgStrandsType);
 
       writeln("Reading trajectory file");
-      var (rawCoords, frames) = coordinatesOther(cfgTraj, nAtoms);
+      var atomsToRead = if cfgTraj.endsWith(".xyz") then origNbp else nAtoms;
+      var (rawCoords, frames) = coordinatesOther(cfgTraj, atomsToRead);
       actualNbp = origNbp;
       numFrames = frames;
       coordDom = rawCoords.domain;
       coords = rawCoords;
       seqDom = {1..actualNbp};
-      finalSeq = origSeq[1..actualNbp];
+      finalSeq = origSeq[0..actualNbp-1];
     } else {
       writeln("Reading trajectory file (no topology)");
       if actualNbp <= 0 then
@@ -572,7 +530,7 @@ module SerraLINE {
 
         // Write
         writeln("Writing output modules");
-        writeAvParms(actualNbp, ndim, numFrames, finalSeq,
+        writeAvParms(actualNbp, nldim, numFrames, finalSeq,
                      avstd_bends, avstd_width, avstd_height, avstd_aratio,
                      cfgTLength, avg_dist, max_dist,
                      avg_dist_rel, max_dist_rel);
@@ -587,7 +545,7 @@ module SerraLINE {
         }
 
         writeln("Writing output modules");
-        writeAvBends(actualNbp, ndim, numFrames,
+        writeAvBends(actualNbp, nldim, numFrames,
                      finalSeq, avstd_bends, cfgTLength);
       }
     }

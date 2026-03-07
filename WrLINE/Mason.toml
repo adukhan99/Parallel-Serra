@@ -4,6 +4,7 @@ license = "None"
 name = "WrLINE"
 type = "application"
 version = "0.1.0"
+compopts = "-M ../shared"
 
 [dependencies]
 

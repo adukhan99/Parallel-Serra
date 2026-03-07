@@ -129,15 +129,15 @@ module Parms {
     const F_AMB_T = "(10F8.3)";
     // OUTPUT PARAMETERS (including bending)
     const F_PARM_1 = "%-15s%-20s";
-    const F_PARM_2 = "%4i%s%4i%s%s%s%s%s%s%10.3dr%10.3dr";
-    const F_PARM_3 = "%10i%-10s";
-    const F_PARM_4 = "%-15s%10.3dr%10.3dr";
-    const F_PARM_5 = "%-20s%10i";
-    const F_PARM_6 = "%-60s%8.3dr%8.3dr";
+    const F_PARM_2 = "%4d%s%4d%s%s%s%s%s%s%10.3f%10.3f";
+    const F_PARM_3 = "%10d%-10s";
+    const F_PARM_4 = "%-15s%10.3f%10.3f";
+    const F_PARM_5 = "%-20s%s";
+    const F_PARM_6 = "%-60s%8.3f%8.3f";
     // BENDINGS (no widths, heights, ...)
     const F_AVB_1 = "%-15s%-20s";
-    const F_AVB_2 = "%4i%s%4i%s%s%s%s%s%s%10.3dr%10.3dr";
-    const F_AVB_3 = "%10i%-10s";
+    const F_AVB_2 = "%4d%s%4d%s%s%s%s%s%s%10.3f%10.3f";
+    const F_AVB_3 = "%10d%-10s";
     // OUTPUT XYZ
     const F_XYZ_T = "(A5,3F9.3)";
 

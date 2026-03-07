@@ -14,55 +14,55 @@ module Functions {
   // TUPLE-BASED VECTOR MATH (stack-allocated, no heap overhead)
   // -----------------------------------------------------------------------
 
-  inline proc mkVec3(x: real, y: real, z: real): vec3 {
+  proc mkVec3(x: real, y: real, z: real): vec3 {
     return (x, y, z);
   }
 
-  inline proc vec3Add(a: vec3, b: vec3): vec3 {
+  proc vec3Add(a: vec3, b: vec3): vec3 {
     return (a(0) + b(0), a(1) + b(1), a(2) + b(2));
   }
 
-  inline proc vec3Sub(a: vec3, b: vec3): vec3 {
+  proc vec3Sub(a: vec3, b: vec3): vec3 {
     return (a(0) - b(0), a(1) - b(1), a(2) - b(2));
   }
 
-  inline proc vec3Scale(a: vec3, s: real): vec3 {
+  proc vec3Scale(a: vec3, s: real): vec3 {
     return (a(0) * s, a(1) * s, a(2) * s);
   }
 
-  inline proc vec3Dot(a: vec3, b: vec3): real {
+  proc vec3Dot(a: vec3, b: vec3): real {
     return a(0) * b(0) + a(1) * b(1) + a(2) * b(2);
   }
 
-  inline proc vec3Norm(a: vec3): real {
+  proc vec3Norm(a: vec3): real {
     return sqrt(a(0)**2 + a(1)**2 + a(2)**2);
   }
 
-  inline proc vec3Norm2(a: vec3): real {
+  proc vec3Norm2(a: vec3): real {
     return a(0)**2 + a(1)**2 + a(2)**2;
   }
 
-  inline proc vec3Normalize(a: vec3): vec3 {
+  proc vec3Normalize(a: vec3): vec3 {
     var n = vec3Norm(a);
     if n < eps then return a;
     return (a(0) / n, a(1) / n, a(2) / n);
   }
 
-  inline proc vec3Cross(a: vec3, b: vec3): vec3 {
+  proc vec3Cross(a: vec3, b: vec3): vec3 {
     return (a(1) * b(2) - a(2) * b(1),
             a(2) * b(0) - a(0) * b(2),
             a(0) * b(1) - a(1) * b(0));
   }
 
   // Matrix-vector multiply: M * v
-  inline proc mat3Vec(m: mat3, v: vec3): vec3 {
+  proc mat3Vec(m: mat3, v: vec3): vec3 {
     return (vec3Dot(m(0), v),
             vec3Dot(m(1), v),
             vec3Dot(m(2), v));
   }
 
   // Matrix-matrix multiply: A * B
-  inline proc mat3Mul(a: mat3, b: mat3): mat3 {
+  proc mat3Mul(a: mat3, b: mat3): mat3 {
     // Columns of B
     var b0 = mkVec3(b(0)(0), b(1)(0), b(2)(0));
     var b1 = mkVec3(b(0)(1), b(1)(1), b(2)(1));
@@ -72,7 +72,7 @@ module Functions {
             (vec3Dot(a(2), b0), vec3Dot(a(2), b1), vec3Dot(a(2), b2)));
   }
 
-  inline proc mat3Transpose(m: mat3): mat3 {
+  proc mat3Transpose(m: mat3): mat3 {
     return ((m(0)(0), m(1)(0), m(2)(0)),
             (m(0)(1), m(1)(1), m(2)(1)),
             (m(0)(2), m(1)(2), m(2)(2)));
@@ -102,24 +102,24 @@ module Functions {
   }
 
   /* Absolute value (norm) of a vector or promoted expression */
-  inline proc absv(a) {
+  proc absv(a) {
     return sqrt(+ reduce(a**2));
   }
 
   /* Square of squared norm of a vector or promoted expression */
-  inline proc absv2(a) {
+  proc absv2(a) {
     return + reduce(a**2);
   }
 
   /* Normalize a vector or promoted expression */
-  inline proc normalizeVector(v) {
+  proc normalizeVector(v) {
     var vsum = sqrt(+ reduce(v**2));
     if vsum < eps then return v;
     return v / vsum;
   }
 
   /* Cross product of two 3D vectors */
-  inline proc crossProduct3(U: [1..3] real, V: [1..3] real) {
+  proc crossProduct3(U: [1..3] real, V: [1..3] real) {
     var res: [1..3] real;
     res[1] = U[2]*V[3] - U[3]*V[2];
     res[2] = U[3]*V[1] - U[1]*V[3];
@@ -219,7 +219,7 @@ module Functions {
   }
 
   /* Matrix inversion for 3x3 matrix (tuple-based) */
-  inline proc mat3Inversion(A: mat3): mat3 {
+  proc mat3Inversion(A: mat3): mat3 {
     var det_A = 
       A(0)(0)*A(1)(1)*A(2)(2) +
       A(0)(1)*A(1)(2)*A(2)(0) +
@@ -409,7 +409,7 @@ module Functions {
   // -----------------------------------------------------------------------
 
   /* Jacobi diagonalization method for real symmetric mat4 (tuple-based) */
-  inline proc diagonalizationJacobi4(M: mat4) {
+  proc diagonalizationJacobi4(M: mat4) {
     var S = M;
     var V: mat4 = ((1.0, 0.0, 0.0, 0.0),
                    (0.0, 1.0, 0.0, 0.0),
@@ -543,7 +543,7 @@ module Functions {
   }
 
   /* Real symmetric matrix M from 3x3 matrix C (tuple-based) */
-  inline proc mat3ToMat4M(C: mat3): mat4 {
+  proc mat3ToMat4M(C: mat3): mat4 {
     var M: mat4;
     M(0) = (C(0)(0) + C(1)(1) + C(2)(2),
             C(1)(2) - C(2)(1),
@@ -578,7 +578,7 @@ module Functions {
   }
 
   /* Largest eigenvector of matrix M from diagonalization results S and V */
-  inline proc largestEigenvec4(S: mat4, V: mat4): vec4 {
+  proc largestEigenvec4(S: mat4, V: mat4): vec4 {
     var larg = eps;
     var j = 0;
     var k = 0;
@@ -594,7 +594,7 @@ module Functions {
   }
 
   /* Rotation matrix R from eigenvector q (tuple-based) */
-  inline proc getRotationRTuple(q: vec4): mat3 {
+  proc getRotationRTuple(q: vec4): mat3 {
     var R: mat3;
     R(0) = (q(0)**2 + q(1)**2 - q(2)**2 - q(3)**2,
             2.0 * (q(1)*q(2) - q(0)*q(3)),
@@ -620,7 +620,7 @@ module Functions {
   }
 
   /* Rotation matrix R from axis u and angle a (tuple-based) */
-  inline proc mat3Rotation(u: vec3, a: real): mat3 {
+  proc mat3Rotation(u: vec3, a: real): mat3 {
     var ca = cos(a);
     var sa = sin(a);
     var omca = 1.0 - ca;
@@ -1399,10 +1399,8 @@ module Functions {
           var Rot = generalRotationMatrix(d, angle);
           for i in 1..nbp {
             var pos = dot(Rot, coords[1..3, i, k]);
-            writer.writef("%s %9.3f %9.3f %9.3f\n", seq[i],
-                               pos[1], pos[2], pos[3]);
-          }
-        }
+            writer.writeln(seq[i], " ", pos[1], " ", pos[2], " ", pos[3]);
+          }        }
         writer.close();
         f.close();
       } else {
@@ -1419,12 +1417,13 @@ module Functions {
           
           var count = 0;
           for i in 1..nbp {
-            for j in 1..3 {
-              writer.writef("%8.3f", rotatedCoords[j,i]);
-              count += 1;
-              if count % 10 == 0 then writer.writeln();
-            }
-          }
+             var pos = dot(Rot, coords[1..3, i, k]);
+             for j in 1..3 {
+               writer.write(pos[j], " ");
+               count += 1;
+               if count % 10 == 0 then writer.writeln();
+             }
+           }
           if count % 10 != 0 then writer.writeln();
         }
         writer.close();
@@ -1450,7 +1449,7 @@ module Functions {
   }
 
   /* Helper to clamp values */
-  inline proc clamp(x: real, lo: real, hi: real) {
+  proc clamp(x: real, lo: real, hi: real) {
     if x < lo then return lo;
     if x > hi then return hi;
     return x;

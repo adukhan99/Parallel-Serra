@@ -31,19 +31,47 @@ module CustomIO {
 
       while reader.readLine(line) {
         line = line.strip();
+        if line.startsWith("%FLAG") then writeln("Processing flag: ", line);
         if line == "%FLAG POINTERS" {
           reader.readLine(line); // Skip %FORMAT
-          nAtoms = reader.read(int);
-          for 2..7 do reader.read(int);
-          nRes = reader.read(int);
-          box = reader.read(int);
+          nAtoms = reader.read(int); // 1: NATOM
+          for 2..11 do reader.read(int); // skip to 11
+          nRes = reader.read(int); // 12: NRES
+          box = reader.read(int); // 13: IFBOX
+          writeln("Parsed POINTERS: nAtoms=", nAtoms,
+                  " nRes=", nRes, " box=", box);
         } else if line == "%FLAG ATOM_NAME" {
           reader.readLine(line); // Skip %FORMAT
-          for 1..nAtoms do atomNames.pushBack(reader.read(string));
+          for 1..nAtoms {
+            var s = "";
+            for 1..4 {
+              var c: string;
+              reader.readf("%c", c);
+              if c == "\n" {
+                 reader.readf("%c", c);
+              }
+              s += c;
+            }
+            atomNames.pushBack(s);
+          }
         } else 
         if line == "%FLAG RESIDUE_LABEL" {
           reader.readLine(line); // Skip %FORMAT
-          for 1..nRes do resNames.pushBack(reader.read(string));
+          writeln("Reading ", nRes, " residue labels");
+          for 1..nRes {
+            var s = "";
+            for 1..4 {
+              var c: string;
+              reader.readf("%c", c);
+              if c == "\n" {
+                 reader.readf("%c", c);
+              }
+              s += c;
+            }
+            resNames.pushBack(s);
+            if resNames.size <= 10 then
+              writeln("Read residue label: '", s, "'");
+          }
         } else if line == "%FLAG RESIDUE_POINTER" {
           reader.readLine(line); // Skip %FORMAT
           for 1..nRes do resPointers.pushBack(reader.read(int));
@@ -86,15 +114,28 @@ module CustomIO {
       }
 
       nbp = rawSeq.size;
+      writeln("Found ", nbp, " residues matching DNA labels");
       if strandsType == 2 {
-        if nbp % 2 != 0 then halt("Incomplete double stranded structure");
+        if nbp % 2 != 0 then
+          halt("Incomplete double stranded structure: ", nbp);
         nbp /= 2;
       }
+      writeln("Final nbp = ", nbp);
 
-      if nbp <= 4 then halt("DNA fragment must be larger than 4 bp");
+      if nbp <= 4 then
+        halt("DNA fragment must be larger than 4 bp (nbp=", nbp, ")");
 
       // Extract ring atoms indices
       var ringIndices: list(int);
+      // For XYZ files from WrLINE, we only want the first nbp sequence elements
+      // if we are treating the trajectory as having one point per bp step.
+      var finalSeqList: list(string);
+      if strandsType == 2 {
+        for i in 0..nbp-1 do finalSeqList.pushBack(rawSeq[i]);
+      } else {
+        for i in 0..rawSeq.size-1 do finalSeqList.pushBack(rawSeq[i]);
+      }
+
       for i in 0..rawSeq.size-1 {
         var s1 = rawResPointers[i];
         var s2 = if i < rawSeq.size-1 then rawResPointers[i+1] - 1 else nAtoms;
@@ -129,7 +170,7 @@ module CustomIO {
         }
       }
 
-      return (nbp, nAtoms, box, rawSeq.toArray(), ringIndices.toArray());
+      return (nbp, nAtoms, box, finalSeqList.toArray(), ringIndices.toArray());
     }
   }
 
@@ -315,7 +356,8 @@ module CustomIO {
         return readStructuralParms(fileIn);
       } else if cdum.find("BASE-PAIR PARAMETERS") != -1 {
         return readBPP(fileIn);
-      } else {
+      } 
+      else {
         halt("Couldn't identify the type of data file: " + cdum);
       }
     }
@@ -650,9 +692,10 @@ module CustomIO {
   }
 
   /* Write structural parameters to file */
-  proc writeStructural(ref strucp: [] real, ref ovStrucp: [] real, ref avstrp: [] real, 
-                       ref ovAvstrp: [] real, seq: [] string, nbp: int, 
-                       numFrames: int, strandsType: int, isCircular: bool) {
+  proc writeStructural(ref strucp: [] real, ref ovStrucp: [] real, 
+                       ref avstrp: [] real, ref ovAvstrp: [] real, 
+                       seq: [] string, nbp: int, numFrames: int, 
+                       strandsType: int, isCircular: bool) {
     try! {
       var f = open("structural.out", ioMode.cw);
       var writer = f.writer();
@@ -711,9 +754,10 @@ module CustomIO {
   }
 
   /* Write elastic parameters to file */
-  proc writeElasticParms(ref elasp: [] real, ref ovElasp: [] real, seq: [] string,
-                          nbp: int, numFrames: int, strandsType: int,
-                          isCircular: bool) {
+  proc writeElasticParms(ref elasp: [] real, ref ovElasp: [] real,
+                         seq: [] string,
+                         nbp: int, numFrames: int, strandsType: int,
+                         isCircular: bool) {
     try! {
       var f = open("elastic.out", ioMode.cw);
       var writer = f.writer();
@@ -744,21 +788,21 @@ module CustomIO {
       var l = 0;
       var nSteps = if isCircular then nbp else nbp-1;
       for i in 1..nSteps {
-          var w = if isCircular && i == nbp then 1 else i + 1;
-          l += 1;
-          var s2_1 = if strandsType == 2 then seq[2*nbp-w+1] else "#";
-          var s2_2 = if strandsType == 2 then seq[2*nbp-i+1] else "#";
-          writer.writef(F_ELAP_2, i, "-", w, " ",
-                      seq[i], seq[w], "/", s2_1, s2_2);
-          for p in 1..13 {
-              writer.writef("%20.3f", elasp[p, l]);
-          }
-          writer.writeln();
+        var w = if isCircular && i == nbp then 1 else i + 1;
+        l += 1;
+        var s2_1 = if strandsType == 2 then seq[2*nbp-w+1] else "#";
+        var s2_2 = if strandsType == 2 then seq[2*nbp-i+1] else "#";
+        writer.writef(F_ELAP_2, i, "-", w, " ",
+                    seq[i], seq[w], "/", s2_1, s2_2);
+        for p in 1..13 {
+            writer.writef("%20.3f", elasp[p, l]);
+        }
+        writer.writeln();
       }
       writer.writeln("-" * 130);
       writer.write(" AVG-STD= ");
       for p in 1..13 {
-          writer.writef("%10.3f%10.3f", ovElasp[1, p, 1], ovElasp[2, p, 1]);
+        writer.writef("%10.3f%10.3f", ovElasp[1, p, 1], ovElasp[2, p, 1]);
       }
       writer.writeln();
       writer.close();

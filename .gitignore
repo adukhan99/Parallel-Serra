@@ -3,3 +3,4 @@ Mason.lock
 doc/
 sources/
 .vscode/
+.cls-commands.json

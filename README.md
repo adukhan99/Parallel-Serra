@@ -35,8 +35,10 @@ ___________________________________________________________________
                        REQUIREMENTS
                        ------------
 To build from scratch:
-- The chapel language compiler (chpl)
-- The mason build tool
+- Chapel language compiler (chpl)
+- Chapel build setup tool (chpl-shim)
+- Mason build tool
+- make
 - CBLAS
 
 ___________________________________________________________________

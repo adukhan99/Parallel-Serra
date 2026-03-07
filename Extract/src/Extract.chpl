@@ -125,8 +125,10 @@ module Extract {
       select typeParm {
         when 2 { // Elastic
                 var overallSize = if a == 0 && b == 0 then nBsp 
-                                  else if str == 2 then (if a < b then b-a else nbp-a+b)
-                                  else b-a;          var subovElaspMean: [1..13, 1..overallSize] real;
+                                  else if str == 2 then 
+                                    (if a < b then b-a else nbp-a+b)
+                                  else b-a;
+                var subovElaspMean: [1..13, 1..overallSize] real;
           var subovElaspStd: [1..13, 1..overallSize] real;
           forall i in 1..13 {
             var (m, s) = centralFragmentMeanStd(elasp[i, ..], a, b, nbp, str);
@@ -138,11 +140,14 @@ module Extract {
         }
         when 3 { // Structural
                 var overallSize = if a == 0 && b == 0 then nBsp 
-                                  else if str == 2 then (if a < b then b-a else nbp-a+b)
-                                  else b-a;          var subovStrucpMean: [1..2, 1..11, 1..overallSize] real;
+                                  else if str == 2 then
+                                    (if a < b then b-a else nbp-a+b)
+                                  else b-a;
+                var subovStrucpMean: [1..2, 1..11, 1..overallSize] real;
           var subovStrucpStd: [1..2, 1..11, 1..overallSize] real;
           forall (i, j) in {1..2, 1..11} {
-            var (m, s) = centralFragmentMeanStd(strucp[i, j, ..], a, b, nbp, str);
+            var (m, s) = 
+              centralFragmentMeanStd(strucp[i, j, ..], a, b, nbp, str);
             subovStrucpMean[i, j, ..] = m;
             subovStrucpStd[i, j, ..] = s;
           }
@@ -161,43 +166,52 @@ module Extract {
     }
   }
 
-  // Sorting by midpoint (bubble sort as in Fortran)
-  proc sortByMid(ref mid: [] real, ref data: [?D2] real) {
-    var n = mid.size;
-    for j in 1..n-1 {
-      for i in 1..n-j {
-        if mid[i] > mid[i+1] {
-          var tmpM = mid[i];
-          mid[i] = mid[i+1];
-          mid[i+1] = tmpM;
-          
-          var tmpD: [D2.dim(0)] real = data[.., i];
-          data[.., i] = data[.., i+1];
-          data[.., i+1] = tmpD;
-        }
+  // Helper to calculate the sorted order of indices (Parallel Sort)
+  private proc getSortPermutation(mid: [] real) {
+    use Sort;
+    var indices: [mid.domain] int = mid.domain;
+    record indexComparator: keyComparator {
+      const vals;
+      proc key(i: int) {
+        return vals[i];
       }
     }
+    sort(indices, new indexComparator(mid));
+    return indices;
   }
 
-  proc sortByMid(ref mid: [] real, ref data1: [?D2] real, ref data2: [?D3] real) {
-    var n = mid.size;
-    for j in 1..n-1 {
-      for i in 1..n-j {
-        if mid[i] > mid[i+1] {
-          var tmpM = mid[i];
-          mid[i] = mid[i+1];
-          mid[i+1] = tmpM;
-          
-          var tmpD1: [D2.dim(0), D2.dim(1)] real = data1[.., .., i];
-          data1[.., .., i] = data1[.., .., i+1];
-          data1[.., .., i+1] = tmpD1;
-
-          var tmpD2: [D3.dim(0)] real = data2[.., i];
-          data2[.., i] = data2[.., i+1];
-          data2[.., i+1] = tmpD2;
-        }
-      }
+  // Sorting by midpoint overloads
+  proc sortByMid(ref mid: [] real, ref data: [] real) {
+    const indices = getSortPermutation(mid);
+    var sortedMid: [mid.domain] real;
+    var sortedData: [data.domain] real;
+    forall (newIdx, oldIdx) in zip(mid.domain, indices) {
+      sortedMid[newIdx] = mid[oldIdx];
+      forall j in data.dim(0) do
+        sortedData[j, newIdx] = data[j, oldIdx];
     }
+    mid = sortedMid;
+    data = sortedData;
+  }
+
+  proc sortByMid(ref mid: [] real,
+                ref data1: [] real,
+                ref data2: [] real) {
+    const indices = getSortPermutation(mid);
+    var sortedMid: [mid.domain] real;
+    var sortedData1: [data1.domain] real;
+    var sortedData2: [data2.domain] real;
+    forall (newIdx, oldIdx) in zip(mid.domain, indices) {
+      sortedMid[newIdx] = mid[oldIdx];
+      forall j in data1.dim(0) do
+        forall k in data1.dim(1) do
+          sortedData1[j, k, newIdx] = data1[j, k, oldIdx];
+      forall j in data2.dim(0) do
+        sortedData2[j, newIdx] = data2[j, oldIdx];
+    }
+    mid = sortedMid;
+    data1 = sortedData1;
+    data2 = sortedData2;
   }
 
   // Helper functions for writing extracted data
@@ -218,7 +232,9 @@ module Extract {
     }
   }
 
-  proc writeExtracted3D2D(ref mid: [] real, ref data1: [] real, ref data2: [] real,
+  proc writeExtracted3D2D(ref mid: [] real,
+                        ref data1: [] real,
+                        ref data2: [] real,
                         filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
