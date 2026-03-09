@@ -65,10 +65,10 @@ module SerraNA {
   proc main() {
     try! {
       // Load config file values as defaults (CLI flags override them).
-      var cfgTop = top;
-      var cfgTraj = traj;
-      var cfgStrandsType = strandsType;
-      var cfgStructType = structType;
+      var cfgTop = top,
+          cfgTraj = traj,
+          cfgStrandsType = strandsType,
+          cfgStructType = structType;
 
       if configFile != "" {
         var cfg = parseConfigFile(configFile);
@@ -106,11 +106,10 @@ module SerraNA {
 
       writeln("Reading trajectory file");
       var isCircular = (cfgStructType == 2);
-      
+
       var coordDom = {1..3, 1..0, 1..0};
       var coords: [coordDom] real;
-      var frames: int;
-      var nbp: int;
+      var frames, nbp: int;
       var seqDom = {1..0};
       var seq: [seqDom] string;
 
@@ -137,13 +136,11 @@ module SerraNA {
       var BPPDomain = {1..6, 1..nbp, 1..frames};
       var BPP: [BPPDomain] real;
       var EE_CL_Domain = {1..n_bsp, 1..frames};
-      var E_E_dist: [EE_CL_Domain] real;
-      var C_length: [EE_CL_Domain] real;
+      var E_E_dist, C_length: [EE_CL_Domain] real;
       var addedBspDomain = {1..3, 1..n_bsp, 1..frames};
       var added_bsp: [addedBspDomain] real;
 
-      var V: [1..4, 1..4, 1..n_bsp] real;
-      var V__1: [1..4, 1..4, 1..n_bsp] real;
+      var V, V__1: [1..4, 1..4, 1..n_bsp] real;
       var F: [1..10, 1..n_bsp] real;
       var Ad2: [1..n_bsp] real;
 
@@ -258,8 +255,8 @@ module SerraNA {
                 added_bsp[1..3, bspIdx-nbp+j-1, k] + BSP[1..3, i+j-1, k];
             }
           }
-        } else 
-        if i_case == 3 {
+        }
+        else if i_case == 3 {
           for i in 1..nbp-1 {
             bspIdx += 1;
             var w = i+1;
@@ -438,8 +435,7 @@ module SerraNA {
 
       var avstd_BPP: [1..2, 1..6, 1..nbp] real;
       var avstd_BSP: [1..2, 1..9, 1..n_bsp] real;
-      var avstd_E_E: [1..2, 1..n_bsp] real;
-      var avstd_C_l: [1..2, 1..n_bsp] real;
+      var avstd_E_E, avstd_C_l: [1..2, 1..n_bsp] real;
       var avstd_added: [1..2, 1..3, 1..n_bsp] real;
 
       if cfgStrandsType == 2 {
@@ -459,10 +455,10 @@ module SerraNA {
           avstd_BSP[2, j, i] = res[2];
         }
         var resE = averageStd(E_E_dist[i, 1..frames]);
-        avstd_E_E[1, i] = resE[1]; 
+        avstd_E_E[1, i] = resE[1];
         avstd_E_E[2, i] = resE[2];
         var resC = averageStd(C_length[i, 1..frames]);
-        avstd_C_l[1, i] = resC[1]; 
+        avstd_C_l[1, i] = resC[1];
         avstd_C_l[2, i] = resC[2];
         for j in 1..3 {
           var resA = averageStd(added_bsp[j, i, 1..frames]);

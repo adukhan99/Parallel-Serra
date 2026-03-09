@@ -15,13 +15,9 @@ module WrLINE {
   use IO;
   use FileSystem;
 
-  config var name: string = "";
-  config var top: string = "";
-  config var traj: string = "";
-  config var nbp: int = 0;
-  config var nstep: int = 0;
-  config var doStrip: bool = false;
-  config var isCircular: bool = false;
+  config var name, top, traj: string = "";
+  config var nbp, nstep: int = 0;
+  config var doStrip, isCircular: bool = false;
 
   // -----------------------------------------------------------------------
   // TUPLE-BASED VECTOR MATH (stack-allocated, no heap overhead)
@@ -75,9 +71,9 @@ module WrLINE {
   // Matrix-matrix multiply: A * B
   proc matMul(a: mat3, b: mat3): mat3 {
     // Columns of B
-    var b0 = mkVec(b(0)(0), b(1)(0), b(2)(0));
-    var b1 = mkVec(b(0)(1), b(1)(1), b(2)(1));
-    var b2 = mkVec(b(0)(2), b(1)(2), b(2)(2));
+    var b0 = mkVec(b(0)(0), b(1)(0), b(2)(0)),
+        b1 = mkVec(b(0)(1), b(1)(1), b(2)(1)),
+        b2 = mkVec(b(0)(2), b(1)(2), b(2)(2));
     return ((vecDot(a(0), b0), vecDot(a(0), b1), vecDot(a(0), b2)),
             (vecDot(a(1), b0), vecDot(a(1), b1), vecDot(a(1), b2)),
             (vecDot(a(2), b0), vecDot(a(2), b1), vecDot(a(2), b2)));
@@ -95,8 +91,8 @@ module WrLINE {
       return atan(y / x);        // Q1
     } else if x < 0.0 && y >= 0.0 {
       return atan(y / x) + pi;   // Q2
-    } else 
-    if x < 0.0 && y < 0.0 {
+    }
+    else if x < 0.0 && y < 0.0 {
       return atan(y / x) - pi;   // Q3
     } else {
       return atan(y / x);        // Q4
@@ -210,8 +206,7 @@ module WrLINE {
       f.close();
 
       // Build strand arrays directly from flat coords
-      var rA: [1..3, 1..inNstep, 1..inNbp] real;
-      var rB: [1..3, 1..inNstep, 1..inNbp] real;
+      var rA, rB: [1..3, 1..inNstep, 1..inNbp] real;
 
       // coords layout: for each atom (nstep * nbp*2 atoms), 3 values
       var atomsPerStep = inNbp * 2;
@@ -470,41 +465,43 @@ module WrLINE {
                  ref r1: [1..3, 1..inNstep, 1..inNbp] real) {
     coforall task in 1..4 {
       try! {
-        select task { 
+        select task {
           when 1 {
             var f = open(inName + "/C.xyz", ioMode.cw);
             var w = f.writer();
             for i in 1..inNstep {
-              w.writeln(inNbp); 
+              w.writeln(inNbp);
               w.writeln();
               for j in 1..inNbp do
                 w.writef("H %8.3dr %8.3dr %8.3dr \n",
                         r[1,i,j], r[2,i,j], r[3,i,j]);
+            }
           }
-        } when 2 {
-          var f = open(inName + "/C1.xyz", ioMode.cw);
-          var w = f.writer();
+          when 2 {
+            var f = open(inName + "/C1.xyz", ioMode.cw);
+            var w = f.writer();
             for i in 1..inNstep {
               w.writeln(inNbp);
               w.writeln();
               for j in 1..inNbp do
                 w.writef("H %8.3dr %8.3dr %8.3dr \n",
                         r1[1,i,j], r1[2,i,j], r1[3,i,j]);
+            }
           }
-        } when 3 {
+          when 3 {
             var f = open(inName + "/C.3col", ioMode.cw);
             var w = f.writer();
             for i in 1..inNstep do for j in 1..inNbp do
               w.writef("%8.3dr %8.3dr %8.3dr \n",
                       r[1,i,j], r[2,i,j], r[3,i,j]);
-        } when 4 {
+          }
+          when 4 {
             var f = open(inName + "/C1.3col", ioMode.cw);
             var w = f.writer();
             for i in 1..inNstep do for j in 1..inNbp do
               w.writef("%8.3dr %8.3dr %8.3dr \n",
                      r1[1,i,j], r1[2,i,j], r1[3,i,j]);
-          }
-        }
+          }        }
       }
     }
   }

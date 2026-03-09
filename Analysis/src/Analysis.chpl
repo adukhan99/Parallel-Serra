@@ -20,23 +20,23 @@ module Analysis {
   config var elasFile: string = "elastic.out";
   config var strucFile: string = "structural.out";
 
-  // Persistence-length subfragment [rA_a..rA_b] and sublength [rA_l1..rA_l2]
-  config var rA_a:  int = 0;
-  config var rA_b:  int = 0;
-  config var rA_l1: int = 0;
-  config var rA_l2: int = 0;
+  // Persistence-length subfragment [rAa..rAb] and sublength [rAl1..rAl2]
+  config var rAa: int = 0;
+  config var rAb: int = 0;
+  config var rAl1: int = 0;
+  config var rAl2: int = 0;
 
   // Twist subfragment and sublength
-  config var rT_a:  int = 0;
-  config var rT_b:  int = 0;
-  config var rT_l1: int = 0;
-  config var rT_l2: int = 0;
+  config var rTa: int = 0;
+  config var rTb: int = 0;
+  config var rTl1: int = 0;
+  config var rTl2: int = 0;
 
   // Stretch subfragment and sublength
-  config var rS_a:  int = 0;
-  config var rS_b:  int = 0;
-  config var rS_l1: int = 0;
-  config var rS_l2: int = 0;
+  config var rSa: int = 0;
+  config var rSb: int = 0;
+  config var rSl1: int = 0;
+  config var rSl2: int = 0;
 
   /*
    * Parse a simple key = value config file.
@@ -66,14 +66,14 @@ module Analysis {
 
   proc main() {
     // Load config file values as defaults (CLI flags override them).
-    var cfgElasFile = elasFile;
-    var cfgStrucFile = strucFile;
-    var cfgRaA = rA_a; var cfgRaB = rA_b;
-    var cfgRaL1 = rA_l1; var cfgRaL2 = rA_l2;
-    var cfgRtA = rT_a; var cfgRtB = rT_b;
-    var cfgRtL1 = rT_l1; var cfgRtL2 = rT_l2;
-    var cfgRsA = rS_a; var cfgRsB = rS_b;
-    var cfgRsL1 = rS_l1; var cfgRsL2 = rS_l2;
+    var cfgElasFile = elasFile,
+        cfgStrucFile = strucFile;
+    var cfgRaA = rAa, cfgRaB = rAb,
+        cfgRaL1 = rAl1, cfgRaL2 = rAl2;
+    var cfgRtA = rTa, cfgRtB = rTb,
+        cfgRtL1 = rTl1, cfgRtL2 = rTl2;
+    var cfgRsA = rSa, cfgRsB = rSb,
+        cfgRsL1 = rSl1, cfgRsL2 = rSl2;
 
     if configFile != "" {
       var cfg = parseConfigFile(configFile);
@@ -81,30 +81,30 @@ module Analysis {
         cfgElasFile = try! cfg["elasFile"];
       if strucFile == "structural.out" && cfg.contains("strucFile") then
         cfgStrucFile = try! cfg["strucFile"];
-      if rA_a == 0 && cfg.contains("rA_a") then
-        cfgRaA = try! cfg["rA_a"]:int;
-      if rA_b == 0 && cfg.contains("rA_b") then
-        cfgRaB = try! cfg["rA_b"]:int;
-      if rA_l1 == 0 && cfg.contains("rA_l1") then
-        cfgRaL1 = try! cfg["rA_l1"]:int;
-      if rA_l2 == 0 && cfg.contains("rA_l2") then
-        cfgRaL2 = try! cfg["rA_l2"]:int;
-      if rT_a == 0 && cfg.contains("rT_a") then
-        cfgRtA = try! cfg["rT_a"]:int;
-      if rT_b == 0 && cfg.contains("rT_b") then
-        cfgRtB = try! cfg["rT_b"]:int;
-      if rT_l1 == 0 && cfg.contains("rT_l1") then
-        cfgRtL1 = try! cfg["rT_l1"]:int;
-      if rT_l2 == 0 && cfg.contains("rT_l2") then
-        cfgRtL2 = try! cfg["rT_l2"]:int;
-      if rS_a == 0 && cfg.contains("rS_a") then
-        cfgRsA = try! cfg["rS_a"]:int;
-      if rS_b == 0 && cfg.contains("rS_b") then
-        cfgRsB = try! cfg["rS_b"]:int;
-      if rS_l1 == 0 && cfg.contains("rS_l1") then
-        cfgRsL1 = try! cfg["rS_l1"]:int;
-      if rS_l2 == 0 && cfg.contains("rS_l2") then
-        cfgRsL2 = try! cfg["rS_l2"]:int;
+      if rAa == 0 && cfg.contains("rAa") then
+        cfgRaA = try! cfg["rAa"]:int;
+      if rAb == 0 && cfg.contains("rAb") then
+        cfgRaB = try! cfg["rAb"]:int;
+      if rAl1 == 0 && cfg.contains("rAl1") then
+        cfgRaL1 = try! cfg["rAl1"]:int;
+      if rAl2 == 0 && cfg.contains("rAl2") then
+        cfgRaL2 = try! cfg["rAl2"]:int;
+      if rTa == 0 && cfg.contains("rTa") then
+        cfgRtA = try! cfg["rTa"]:int;
+      if rTb == 0 && cfg.contains("rTb") then
+        cfgRtB = try! cfg["rTb"]:int;
+      if rTl1 == 0 && cfg.contains("rTl1") then
+        cfgRtL1 = try! cfg["rTl1"]:int;
+      if rTl2 == 0 && cfg.contains("rTl2") then
+        cfgRtL2 = try! cfg["rTl2"]:int;
+      if rSa == 0 && cfg.contains("rSa") then
+        cfgRsA = try! cfg["rSa"]:int;
+      if rSb == 0 && cfg.contains("rSb") then
+        cfgRsB = try! cfg["rSb"]:int;
+      if rSl1 == 0 && cfg.contains("rSl1") then
+        cfgRsL1 = try! cfg["rSl1"]:int;
+      if rSl2 == 0 && cfg.contains("rSl2") then
+        cfgRsL2 = try! cfg["rSl2"]:int;
     }
 
     // -----------------------------------------------------------------------
@@ -189,36 +189,36 @@ module Analysis {
     // -----------------------------------------------------------------------
     // VALIDATE RANGES
     // -----------------------------------------------------------------------
-    var whole_Af = (rA[1, 1] == 0 && rA[2, 1] == 0);
-    var whole_Al = (rA[1, 2] == 0 && rA[2, 2] == 0);
+    var wholeAf = (rA[1, 1] == 0 && rA[2, 1] == 0);
+    var wholeAl = (rA[1, 2] == 0 && rA[2, 2] == 0);
     validateSubfrag(rA[1, 1], rA[2, 1], nbp, str, "Persistence length");
     validateSublen(rA[1, 2], rA[2, 2], rA[1, 1], rA[2, 1],
                    nbp, "Persistence length");
 
-    var whole_Tf = (rT[1, 1] == 0 && rT[2, 1] == 0);
-    var whole_Tl = (rT[1, 2] == 0 && rT[2, 2] == 0);
+    var wholeTf = (rT[1, 1] == 0 && rT[2, 1] == 0);
+    var wholeTl = (rT[1, 2] == 0 && rT[2, 2] == 0);
     validateSubfrag(rT[1, 1], rT[2, 1], nbp, str, "Twist");
     validateSublen(rT[1, 2], rT[2, 2], rT[1, 1], rT[2, 1],
                    nbp, "Twist");
 
     // Stretch subfragment: apply default midpoint selection when not given.
-    var whole_Sf: bool;
+    var wholeSf: bool;
     if rS[1, 1] == 0 && rS[2, 1] == 0 {
       if str == 2 {
-        whole_Sf = true;
+        wholeSf = true;
       } else if nbp >= 18 {
         var s = nbp / 2;
         rS[1, 1] = s - 8;
         rS[2, 1] = s + 9;
-        whole_Sf = false;
+        wholeSf = false;
       } else {
-        whole_Sf = true;
+        wholeSf = true;
       }
     } else {
-      whole_Sf = false;
+      wholeSf = false;
     }
-    var whole_Sl = (rS[1, 2] == 0 && rS[2, 2] == 0);
-    if !whole_Sf then
+    var wholeSl = (rS[1, 2] == 0 && rS[2, 2] == 0);
+    if !wholeSf then
       validateSubfrag(rS[1, 1], rS[2, 1], nbp, str, "Stretch");
     validateSublen(rS[1, 2], rS[2, 2], rS[1, 1], rS[2, 1],
                    nbp, "Stretch");
@@ -226,127 +226,127 @@ module Analysis {
     // -----------------------------------------------------------------------
     // COMPUTE AVERAGING VECTOR SIZES
     // -----------------------------------------------------------------------
-    var A_n = rangeN(rA[1, 1], rA[2, 1], nbp);
-    var T_n = rangeN(rT[1, 1], rT[2, 1], nbp);
-    var S_n = rangeN(rS[1, 1], rS[2, 1], nbp);
+    var aN = rangeN(rA[1, 1], rA[2, 1], nbp);
+    var tN = rangeN(rT[1, 1], rT[2, 1], nbp);
+    var sN = rangeN(rS[1, 1], rS[2, 1], nbp);
 
     // -----------------------------------------------------------------------
     // REARRANGE DATA INTO 1-D AVERAGING VECTORS
     // -----------------------------------------------------------------------
 
     // Tilt: elastic param index 4
-    var av_tilt: [1..A_n] real;
-    if whole_Af {
-      av_tilt = ovElasp[1, 4, 1..A_n];
+    var avTilt: [1..aN] real;
+    if wholeAf {
+      avTilt = ovElasp[1, 4, 1..aN];
     } else {
       var col: [1..elasp.dim(1).size] real;
       for i in 1..elasp.dim(1).size do col[i] = elasp[4, i];
-      av_tilt = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
+      avTilt = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
     }
 
     // Roll: elastic param index 3
-    var av_roll: [1..A_n] real;
-    if whole_Af {
-      av_roll = ovElasp[1, 3, 1..A_n];
+    var avRoll: [1..aN] real;
+    if wholeAf {
+      avRoll = ovElasp[1, 3, 1..aN];
     } else {
       var col: [1..elasp.dim(1).size] real;
       for i in 1..elasp.dim(1).size do col[i] = elasp[3, i];
-      av_roll = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
+      avRoll = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
     }
 
     // Dynamic persistence length from tilt & roll: elastic param index 11
-    var av_Ad_c: [1..A_n] real;
-    if whole_Af {
-      av_Ad_c = ovElasp[1, 11, 1..A_n];
+    var avAdC: [1..aN] real;
+    if wholeAf {
+      avAdC = ovElasp[1, 11, 1..aN];
     } else {
       var col: [1..elasp.dim(1).size] real;
       for i in 1..elasp.dim(1).size do col[i] = elasp[11, i];
-      av_Ad_c = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
+      avAdC = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
     }
 
     // Twist: elastic param index 2
-    var av_twist: [1..T_n] real;
-    if whole_Tf {
-      av_twist = ovElasp[1, 2, 1..T_n];
+    var avTwist: [1..tN] real;
+    if wholeTf {
+      avTwist = ovElasp[1, 2, 1..tN];
     } else {
       var col: [1..elasp.dim(1).size] real;
       for i in 1..elasp.dim(1).size do col[i] = elasp[2, i];
-      av_twist = centralFragment(col, rT[1, 1], rT[2, 1], nbp, str);
+      avTwist = centralFragment(col, rT[1, 1], rT[2, 1], nbp, str);
     }
 
     // Partial variance of end-to-end distance: elastic param index 13
-    var av_E_E: [1..S_n] real;
-    if whole_Sf {
-      av_E_E = ovElasp[1, 13, 1..S_n];
+    var avEE: [1..sN] real;
+    if wholeSf {
+      avEE = ovElasp[1, 13, 1..sN];
     } else {
       var col: [1..elasp.dim(1).size] real;
       for i in 1..elasp.dim(1).size do col[i] = elasp[13, i];
-      av_E_E = centralFragment(col, rS[1, 1], rS[2, 1], nbp, str);
+      avEE = centralFragment(col, rS[1, 1], rS[2, 1], nbp, str);
     }
 
     // Squared bending angle (strucp index 10):
     //   transform to 1 - angle²/2  [in rad²]
-    var av_b2: [1..A_n] real;
-    if whole_Af {
-      for i in 1..A_n do
-        av_b2[i] = 1.0 - 0.5 * ovStrucp[1, 10, i]
+    var avB2: [1..aN] real;
+    if wholeAf {
+      for i in 1..aN do
+        avB2[i] = 1.0 - 0.5 * ovStrucp[1, 10, i]
                              * deg_to_rad * deg_to_rad;
     } else {
       var nBsp = strucp.dim(2).size;
       var col: [1..nBsp] real;
       for i in 1..nBsp do
         col[i] = 1.0 - 0.5 * strucp[1, 10, i] * deg_to_rad * deg_to_rad;
-      av_b2 = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
+      avB2 = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
     }
 
     // Average-structure bend² (avstrp index 2):
     //   transform similarly
-    var b2_avstr: [1..A_n] real;
-    if whole_Af {
-      for i in 1..A_n do
-        b2_avstr[i] = 1.0 - 0.5 * ovAvstrp[1, 2, i]
+    var b2Avstr: [1..aN] real;
+    if wholeAf {
+      for i in 1..aN do
+        b2Avstr[i] = 1.0 - 0.5 * ovAvstrp[1, 2, i]
                                  * deg_to_rad * deg_to_rad;
     } else {
       var nBsp = avstrp.dim(1).size;
       var col: [1..nBsp] real;
       for i in 1..nBsp do
         col[i] = 1.0 - 0.5 * avstrp[2, i] * deg_to_rad * deg_to_rad;
-      b2_avstr = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
+      b2Avstr = centralFragment(col, rA[1, 1], rA[2, 1], nbp, str);
     }
 
     // -----------------------------------------------------------------------
     // SET SUBLENGTH RANGES WHEN USING WHOLE-FRAGMENT DEFAULTS
     // -----------------------------------------------------------------------
-    if whole_Al {
-      if A_n >= 21 {
+    if wholeAl {
+      if aN >= 21 {
         rA[1, 2] = 11;
-        rA[2, 2] = A_n - 10;
+        rA[2, 2] = aN - 10;
       } else {
         rA[1, 2] = 1;
-        rA[2, 2] = A_n;
+        rA[2, 2] = aN;
       }
     }
 
-    if whole_Tl {
-      if T_n >= 21 {
+    if wholeTl {
+      if tN >= 21 {
         rT[1, 2] = 11;
-        rT[2, 2] = T_n - 10;
+        rT[2, 2] = tN - 10;
       } else {
         rT[1, 2] = 1;
-        rT[2, 2] = T_n;
+        rT[2, 2] = tN;
       }
     }
 
-    if whole_Sl {
-      if S_n >= 17 {
+    if wholeSl {
+      if sN >= 17 {
         rS[1, 2] = 8;
         rS[2, 2] = 17;
-      } else if S_n >= 10 {
+      } else if sN >= 10 {
         rS[1, 2] = 8;
-        rS[2, 2] = S_n;
+        rS[2, 2] = sN;
       } else {
         rS[1, 2] = 1;
-        rS[2, 2] = S_n;
+        rS[2, 2] = sN;
       }
     }
 
@@ -356,20 +356,20 @@ module Analysis {
 
     // Tilt
     var lA = rA[2, 2] - rA[1, 2] + 1;
-    var Tilt = averageStd(av_tilt[rA[1, 2]..rA[2, 2]]);
+    var Tilt = averageStd(avTilt[rA[1, 2]..rA[2, 2]]);
     Tilt[2] /= sqrt(lA:real);
 
     // Roll
-    var Roll = averageStd(av_roll[rA[1, 2]..rA[2, 2]]);
+    var Roll = averageStd(avRoll[rA[1, 2]..rA[2, 2]]);
     Roll[2] /= sqrt(lA:real);
 
     // Dynamic persistence length (c) from tilt & roll averages
-    var Ad_c = averageStd(av_Ad_c[rA[1, 2]..rA[2, 2]]);
-    Ad_c[2] /= sqrt(lA:real);
+    var adC = averageStd(avAdC[rA[1, 2]..rA[2, 2]]);
+    adC[2] /= sqrt(lA:real);
 
     // Twist
     var lT = rT[2, 2] - rT[1, 2] + 1;
-    var Twist = averageStd(av_twist[rT[1, 2]..rT[2, 2]]);
+    var Twist = averageStd(avTwist[rT[1, 2]..rT[2, 2]]);
     Twist[2] /= sqrt(lT:real);
 
     // Stretch via simple linear regression
@@ -379,69 +379,69 @@ module Analysis {
 
     var Stretch: [1..4] real;
     var (_, bS, cS) = simpleLinearRegression(
-      av_E_E[rS[1, 2]..rS[2, 2]], tempS);
+      avEE[rS[1, 2]..rS[2, 2]], tempS);
     Stretch[3] = bS;
     Stretch[4] = cS;
     Stretch[1] = bnm * 1.0e23 * bKTpN / Stretch[3];
-    var r_aux = bnm * 1.0e23 * bKTpN * Stretch[4];
-    Stretch[4] = abs(r_aux / Stretch[3]**2);
+    var rAux = bnm * 1.0e23 * bKTpN * Stretch[4];
+    Stretch[4] = abs(rAux / Stretch[3]**2);
 
     // Persistence lengths — linear fit forced through intercept = 1
-    var aux_r = rA[1, 2];
+    var auxR = rA[1, 2];
     rA[1, 2] = 1;
     var lA2 = rA[2, 2] - rA[1, 2] + 1;
     var tempA: [1..lA2] real;
     for i in 0..lA2-1 do tempA[i+1] = (rA[1, 2] + i):real;
 
     // (a) total persistence length
-    var A_a: [1..4] real;
+    var aA: [1..4] real;
     var (_, bAa, cAa) = simpleLinearRegressionA1(
-      av_b2[rA[1, 2]..rA[2, 2]], tempA);
-    A_a[3] = bAa;
-    A_a[4] = cAa;
-    A_a[1] = -bnm / A_a[3];
-    r_aux = bnm * A_a[4];
-    A_a[4] = abs(r_aux / A_a[3]**2);
+      avB2[rA[1, 2]..rA[2, 2]], tempA);
+    aA[3] = bAa;
+    aA[4] = cAa;
+    aA[1] = -bnm / aA[3];
+    rAux = bnm * aA[4];
+    aA[4] = abs(rAux / aA[3]**2);
 
     // (a) static persistence length
-    var As_a: [1..4] real;
+    var asA: [1..4] real;
     var (_, bAsa, cAsa) = simpleLinearRegressionA1(
-      b2_avstr[rA[1, 2]..rA[2, 2]], tempA);
-    As_a[3] = bAsa;
-    As_a[4] = cAsa;
-    As_a[1] = -bnm / As_a[3];
-    r_aux = bnm * As_a[4];
-    As_a[4] = abs(r_aux / As_a[3]**2);
+      b2Avstr[rA[1, 2]..rA[2, 2]], tempA);
+    asA[3] = bAsa;
+    asA[4] = cAsa;
+    asA[1] = -bnm / asA[3];
+    rAux = bnm * asA[4];
+    asA[4] = abs(rAux / asA[3]**2);
 
     // Dynamic contribution b2_d = 1 + av_b2 - b2_avstr
-    var b2_d: [1..A_n] real;
-    for i in 1..A_n do b2_d[i] = 1.0 + av_b2[i] - b2_avstr[i];
+    var b2D: [1..aN] real;
+    for i in 1..aN do b2D[i] = 1.0 + avB2[i] - b2Avstr[i];
 
     // (a) dynamic persistence length
-    var Ad_a: [1..4] real;
+    var adA: [1..4] real;
     var (_, bAda, cAda) = simpleLinearRegressionA1(
-      b2_d[rA[1, 2]..rA[2, 2]], tempA);
-    Ad_a[3] = bAda;
-    Ad_a[4] = cAda;
-    Ad_a[1] = -bnm / Ad_a[3];
-    r_aux = bnm * Ad_a[4];
-    Ad_a[4] = abs(r_aux / Ad_a[3]**2);
+      b2D[rA[1, 2]..rA[2, 2]], tempA);
+    adA[3] = bAda;
+    adA[4] = cAda;
+    adA[1] = -bnm / adA[3];
+    rAux = bnm * adA[4];
+    adA[4] = abs(rAux / adA[3]**2);
 
     // (b) harmonic mean of static and dynamic (a)
-    var A_bb: [1..2] real;
-    A_bb[1] = Ad_a[1] * As_a[1] / (Ad_a[1] + As_a[1]);
+    var aBb: [1..2] real;
+    aBb[1] = adA[1] * asA[1] / (adA[1] + asA[1]);
 
     // (d) harmonic mean using static (a) and dynamic (c)
-    var A_d: [1..2] real;
-    A_d[1] = Ad_c[1] * As_a[1] / (Ad_c[1] + As_a[1]);
+    var aD: [1..2] real;
+    aD[1] = adC[1] * asA[1] / (adC[1] + asA[1]);
 
-    rA[1, 2] = aux_r; // restore aux_r
+    rA[1, 2] = auxR; // restore auxR
 
     // -----------------------------------------------------------------------
     // PRINT RESULTS
     // -----------------------------------------------------------------------
     printElasticConstants(Tilt, Roll, Twist, Stretch,
-                          A_a, As_a, Ad_a, A_bb, Ad_c, A_d,
+                          aA, asA, adA, aBb, adC, aD,
                           rA, rS, rT, str, frames, nbp);
   }
 
@@ -456,7 +456,7 @@ module Analysis {
   private proc rangeN(a: int, b: int, nbp: int): int {
     if a < b then return b - a;
     else if b < a then return nbp + b - a;
-    else 
+    else
       return nbp - 1; // a == b == 0: whole fragment
   }
 
@@ -508,9 +508,9 @@ module Analysis {
    */
   private proc printElasticConstants(Tilt: [] real, Roll: [] real,
                                      Twist: [] real, Stretch: [] real,
-                                     A_a: [] real, As_a: [] real,
-                                     Ad_a: [] real, A_bb: [] real,
-                                     Ad_c: [] real, A_d: [] real,
+                                     aA: [] real, asA: [] real,
+                                     adA: [] real, aBb: [] real,
+                                     adC: [] real, aD: [] real,
                                      rA: [] int, rS: [] int, rT: [] int,
                                      str: int, frames: int, nbp: int) {
     if str == 2 then writeln("CLOSED STRUCTURE ANALYSED");
@@ -534,17 +534,17 @@ module Analysis {
            "Stretch (pN):", Stretch[1], Stretch[2], Stretch[3],
            Stretch[4], "#");
     writef("%-15s %15.3f %15.5f %15.5f %15.3f %15s\n",
-           "A [a] (nm):", A_a[1], A_a[2], A_a[3], A_a[4], "#");
+           "A [a] (nm):", aA[1], aA[2], aA[3], aA[4], "#");
     writef("%-15s %15.3f %15.5f %15.5f %15.3f %15s\n",
-           "As [a] (nm):", As_a[1], As_a[2], As_a[3], As_a[4], "#");
+           "As [a] (nm):", asA[1], asA[2], asA[3], asA[4], "#");
     writef("%-15s %15.3f %15.5f %15.5f %15.3f %15s\n",
-           "Ad [a] (nm):", Ad_a[1], Ad_a[2], Ad_a[3], Ad_a[4], "#");
+           "Ad [a] (nm):", adA[1], adA[2], adA[3], adA[4], "#");
     writef("%-15s %15.3f %15s %15s %15s %15s\n",
-           "A [b] (nm):", A_bb[1], "#", "#", "#", "#");
+           "A [b] (nm):", aBb[1], "#", "#", "#", "#");
     writef("%-15s %15.3f %15s %15s %15s %15.3f\n",
-           "Ad [c] (nm):", Ad_c[1], "#", "#", "#", Ad_c[2]);
+           "Ad [c] (nm):", adC[1], "#", "#", "#", adC[2]);
     writef("%-15s %15.3f %15s %15s %15s %15s\n",
-           "A [d] (nm):", A_d[1], "#", "#", "#", "#");
+           "A [d] (nm):", aD[1], "#", "#", "#", "#");
     writeln("");
 
     if rA[1, 1] != rA[2, 1] {

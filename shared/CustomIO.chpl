@@ -16,18 +16,14 @@ module CustomIO {
    */
   proc topologyAmber(topPath: string, strandsType: int) {
     try! {
-      var nbp: int;
-      var nAtoms: int;
-      var nRes: int;
-      var box: int;
+      var nbp, nAtoms, nRes, box: int;
       
       var f = open(topPath, ioMode.r);
       var reader = f.reader();
       
       var line: string;
-      var resNames: list(string);
+      var resNames, atomNames: list(string);
       var resPointers: list(int);
-      var atomNames: list(string);
 
       while reader.readLine(line) {
         line = line.strip();
@@ -48,14 +44,14 @@ module CustomIO {
               var c: string;
               reader.readf("%c", c);
               if c == "\n" {
-                 reader.readf("%c", c);
+                reader.readf("%c", c);
               }
               s += c;
             }
             atomNames.pushBack(s);
           }
-        } else 
-        if line == "%FLAG RESIDUE_LABEL" {
+        }
+        else if line == "%FLAG RESIDUE_LABEL" {
           reader.readLine(line); // Skip %FORMAT
           writeln("Reading ", nRes, " residue labels");
           for 1..nRes {
@@ -64,7 +60,7 @@ module CustomIO {
               var c: string;
               reader.readf("%c", c);
               if c == "\n" {
-                 reader.readf("%c", c);
+                reader.readf("%c", c);
               }
               s += c;
             }
@@ -78,11 +74,12 @@ module CustomIO {
         }
       }
       f.close();
-        
+
       // Identify nucleotide residues and sequence
       var rawSeq: list(string);
       var rawResPointers: list(int);
-      
+
+
       for (name, ptr) in zip(resNames, resPointers) {
         var found = false;
         var base = "";
@@ -106,7 +103,6 @@ module CustomIO {
           base = "U";
           found = true;
         }
-        
         if found {
           rawSeq.pushBack(base);
           rawResPointers.pushBack(ptr);
@@ -211,9 +207,9 @@ module CustomIO {
       var numFrames = framesList.size;
       
       // Filter coordinates to ring atoms and handle open structure ends
-      var startBp = 1;
-      var endBp = nbp;
-      var actualNbp = nbp;
+      var startBp = 1,
+          endBp = nbp,
+          actualNbp = nbp;
 
       if !isCircular {
         actualNbp = nbp - 4;
@@ -349,26 +345,27 @@ module CustomIO {
 
       if cdum.find("BASE-STEP PARAMETERS") != -1 {
         return readBSP(fileIn);
-      } else if cdum.find("ELASTIC PARAMETERS") != -1 {
+      }
+      if cdum.find("ELASTIC PARAMETERS") != -1 {
         return readElasticParms(fileIn);
-      } else 
+      }
       if cdum.find("STRUCTURAL PARAMETERS") != -1 {
         return readStructuralParms(fileIn);
-      } else if cdum.find("BASE-PAIR PARAMETERS") != -1 {
-        return readBPP(fileIn);
-      } 
-      else {
-        halt("Couldn't identify the type of data file: " + cdum);
       }
+      if cdum.find("BASE-PAIR PARAMETERS") != -1 {
+        return readBPP(fileIn);
+      }
+      
+      halt("Couldn't identify the type of data file: " + cdum);
     }
   }
 
   /* Internal helper to read the header/metadata part of parameter files */
-  private proc readMetadataHelper(reader: ?fileReader) {
+  private proc readMetadataHelper(reader) {
     try! {
       var cdum: string;
       var str, strands, nbp, frames: int;
-      
+
       reader.read(cdum); // CLOSED or LINEAR
       str = if cdum == "CLOSED" then 2 else 1;
       reader.read(cdum); // STRUCTURE
@@ -408,8 +405,8 @@ module CustomIO {
       var (nbp, frames, strands, str, seqI, seqII) = readMetadataHelper(reader);
       var nBsp = if str == 2 then nbp else nbp - 1;
       
-      var BSP: [1..2, 1..7, 1..nBsp] real;
-      var ovBsp: [1..2, 1..7, 1..1] real;
+      var BSP: [1..2, 1..7, 1..nBsp] real,
+          ovBsp: [1..2, 1..7, 1..1] real;
       
       reader.read(cdum); // First column averages...
       reader.readLine(cdum); 
@@ -440,16 +437,15 @@ module CustomIO {
   }
 
   // Define placeholders for empty arrays to keep tuple size consistent
-    private proc matrix(d1: int, d2: int) 
-    {
-      var A: [1..d1, 1..d2] real;
-      return A;
-    }
-    private proc array3D(d1: int, d2: int, d3: int) 
-    {
-      var A: [1..d1, 1..d2, 1..d3] real;
-      return A;
-    }
+  private proc matrix(d1: int, d2: int) {
+    var A: [1..d1, 1..d2] real;
+    return A;
+  }
+  private proc array3D(d1: int, d2: int, d3: int) {
+    var A: [1..d1, 1..d2, 1..d3] real;
+    return A;
+  }
+
   proc readElasticParms(fileIn: string) {
     try! {
       var f = open(fileIn, ioMode.r);
@@ -460,8 +456,8 @@ module CustomIO {
       var (nbp, frames, strands, str, seqI, seqII) = readMetadataHelper(reader);
       var nBsp = if str == 2 then nbp*(nbp-1) else nbp*(nbp-1)/2;
       
-      var elasp: [1..13, 1..nBsp] real;
-      var ovElasp: [1..2, 1..13, 1..nbp-1] real;
+      var elasp: [1..13, 1..nBsp] real,
+          ovElasp: [1..2, 1..13, 1..nbp-1] real;
       
       for j in 1..nbp-1 {
         reader.read(cdum); // bp j
@@ -507,10 +503,10 @@ module CustomIO {
       var (nbp, frames, strands, str, seqI, seqII) = readMetadataHelper(reader);
       var nBsp = if str == 2 then nbp*(nbp-1) else nbp*(nbp-1)/2;
       
-      var strucp: [1..2, 1..11, 1..nBsp] real;
-      var avstrp: [1..3, 1..nBsp] real;
-      var ovStrucp: [1..2, 1..11, 1..nbp-1] real;
-      var ovAvstrp: [1..2, 1..3, 1..nbp-1] real;
+      var strucp: [1..2, 1..11, 1..nBsp] real,
+          avstrp: [1..3, 1..nBsp] real,
+          ovStrucp: [1..2, 1..11, 1..nbp-1] real,
+          ovAvstrp: [1..2, 1..3, 1..nbp-1] real;
 
       for j in 1..nbp-1 {
         reader.read(cdum); // bp j
@@ -556,8 +552,8 @@ module CustomIO {
       var (nbp, frames, strands, str, seqI, seqII) = readMetadataHelper(reader);
       var nBsp = nbp;
       
-      var BPP: [1..2, 1..6, 1..nBsp] real;
-      var ovBpp: [1..2, 1..6] real;
+      var BPP: [1..2, 1..6, 1..nBsp] real,
+          ovBpp: [1..2, 1..6] real;
 
       reader.read(cdum); // base-pair ...
       reader.readLine(cdum);

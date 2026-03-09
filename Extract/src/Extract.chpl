@@ -15,8 +15,7 @@ module Extract {
   config var fileIn: string = "";
   config var typeExt: int = 0;
   config var sublength: int = -1;
-  config var a: int = 0;
-  config var b: int = 0;
+  config var a, b: int = 0;
 
   /*
    * Parse a simple key = value config file.
@@ -46,11 +45,11 @@ module Extract {
 
   proc main() {
     // Load config file values as defaults (CLI flags override them).
-    var cfgFileIn = fileIn;
-    var cfgTypeExt = typeExt;
-    var cfgSublength = sublength;
-    var cfgA = a;
-    var cfgB = b;
+    var cfgFileIn = fileIn,
+        cfgTypeExt = typeExt,
+        cfgSublength = sublength,
+        cfgA = a,
+        cfgB = b;
 
     if configFile != "" {
       var cfg = parseConfigFile(configFile);
@@ -80,7 +79,7 @@ module Extract {
    * Extracts data for a sublength or subfragment from a parameter file.
    */
   proc extractParameters(fileIn: string, typeExt: int, sublength: int,
-                       a: int, b: int) {
+                         a: int, b: int) {
     // Determine the type of file and read it
     var (typeParm, nbp, frames, strands, str, nBsp, seqI, seqII, 
          BSP, ovBsp, elasp, ovElasp, strucp, avstrp, ovStrucp, ovAvstrp, 
@@ -124,35 +123,32 @@ module Extract {
       // Subfragment overall extraction
       select typeParm {
         when 2 { // Elastic
-                var overallSize = if a == 0 && b == 0 then nBsp 
-                                  else if str == 2 then 
-                                    (if a < b then b-a else nbp-a+b)
-                                  else b-a;
-                var subovElaspMean: [1..13, 1..overallSize] real;
-          var subovElaspStd: [1..13, 1..overallSize] real;
+          var overallSize = if a == 0 && b == 0 then nBsp 
+                            else if str == 2 then 
+                              (if a < b then b-a else nbp-a+b)
+                            else b-a;
+          var subovElaspMean, subovElaspStd: [1..13, 1..overallSize] real;
           forall i in 1..13 {
             var (m, s) = centralFragmentMeanStd(elasp[i, ..], a, b, nbp, str);
             subovElaspMean[i, ..] = m;
             subovElaspStd[i, ..] = s;
           }
-          writeOveralls2D(subovElaspMean, subovElaspStd,
-                          "elastic_plot.out");
+          writeOveralls2D(subovElaspMean, subovElaspStd, "elastic_plot.out");
         }
         when 3 { // Structural
-                var overallSize = if a == 0 && b == 0 then nBsp 
-                                  else if str == 2 then
-                                    (if a < b then b-a else nbp-a+b)
-                                  else b-a;
-                var subovStrucpMean: [1..2, 1..11, 1..overallSize] real;
-          var subovStrucpStd: [1..2, 1..11, 1..overallSize] real;
+          var overallSize = if a == 0 && b == 0 then nBsp 
+                            else if str == 2 then
+                              (if a < b then b-a else nbp-a+b)
+                            else b-a;
+          var subovStrucpMean, 
+            subovStrucpStd: [1..2, 1..11, 1..overallSize] real;
           forall (i, j) in {1..2, 1..11} {
             var (m, s) = 
               centralFragmentMeanStd(strucp[i, j, ..], a, b, nbp, str);
             subovStrucpMean[i, j, ..] = m;
             subovStrucpStd[i, j, ..] = s;
           }
-          var subovAvstrpMean: [1..3, 1..overallSize] real;
-          var subovAvstrpStd: [1..3, 1..overallSize] real;
+          var subovAvstrpMean, subovAvstrpStd: [1..3, 1..overallSize] real;
           forall i in 1..3 {
             var (m, s) = centralFragmentMeanStd(avstrp[i, ..], a, b, nbp, str);
             subovAvstrpMean[i, ..] = m;
@@ -195,8 +191,8 @@ module Extract {
   }
 
   proc sortByMid(ref mid: [] real,
-                ref data1: [] real,
-                ref data2: [] real) {
+                 ref data1: [] real,
+                 ref data2: [] real) {
     const indices = getSortPermutation(mid);
     var sortedMid: [mid.domain] real;
     var sortedData1: [data1.domain] real;
@@ -216,7 +212,7 @@ module Extract {
 
   // Helper functions for writing extracted data
   proc writeExtracted2D(ref mid: [] real, ref data: [] real,
-                      filename: string) {
+                        filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
       var writer = f.writer();
@@ -233,9 +229,9 @@ module Extract {
   }
 
   proc writeExtracted3D2D(ref mid: [] real,
-                        ref data1: [] real,
-                        ref data2: [] real,
-                        filename: string) {
+                          ref data1: [] real,
+                          ref data2: [] real,
+                          filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
       var writer = f.writer();
@@ -276,7 +272,7 @@ module Extract {
   }
 
   proc writeOveralls2D(ref mean: [] real, ref std: [] real,
-                     filename: string) {
+                       filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
       var writer = f.writer();
@@ -299,7 +295,7 @@ module Extract {
   }
 
   proc writeOveralls3D2D(ref m1: [] real, ref s1: [] real, ref m2: [] real,
-                       ref s2: [] real, filename: string) {
+                         ref s2: [] real, filename: string) {
     try! {
       var f = open(filename, ioMode.cw);
       var writer = f.writer();

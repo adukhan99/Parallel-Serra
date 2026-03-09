@@ -243,314 +243,314 @@ module SerraLINE {
 
   proc main() {
     try! {
-    // Load config file values as defaults (CLI flags override them).
-    var cfgTop = top;
-    var cfgTraj = traj;
-    var cfgIsCircular = isCircular;
-    var cfgStrandsType = strandsType;
-    var cfgNbpArg = nbpArg;
-    var cfgFitplane = fitplane;
-    var cfgBpFitting = bpFitting;
-    var cfgTLength = tLength;
-    var cfgPrintProj = printProj;
-    var cfgXyzFormat = xyzFormat;
-
-    if configFile != "" {
-      var cfg = parseConfigFile(configFile);
-      // Config values serve as defaults; CLI flags always win.
-      if top == "" then
-        cfgTop = cfg.get("top", cfgTop);
-      if traj == "" then
-        cfgTraj = cfg.get("traj", cfgTraj);
-      if !isCircular && cfg.contains("isCircular") then
-        cfgIsCircular = cfg["isCircular"] == "true";
-      if strandsType == 1 && cfg.contains("strandsType") then
-        cfgStrandsType = cfg["strandsType"]:int;
-      if nbpArg == 0 && cfg.contains("nbpArg") then
-        cfgNbpArg = cfg["nbpArg"]:int;
-      if fitplane && cfg.contains("fitplane") then
-        cfgFitplane = cfg["fitplane"] == "true";
-      if bpFitting == "0" then
-        cfgBpFitting = cfg.get("bpFitting", cfgBpFitting);
-      if tLength == 1 && cfg.contains("tLength") then
-        cfgTLength = cfg["tLength"]:int;
-      if !printProj && cfg.contains("printProj") then
-        cfgPrintProj = cfg["printProj"] == "true";
-      if !xyzFormat && cfg.contains("xyzFormat") then
-        cfgXyzFormat = cfg["xyzFormat"] == "true";
-    }
-
-    if cfgTraj == "" {
-      writeln(
-        "Trajectory file must be specified using --traj=<file>" +
-        " or via --configFile=<file>");
-      return;
-    }
-
-    // Use named domains so that we can reassign them to empty ranges
-    // to release memory, mirroring Fortran's deallocate() calls.
-    var actualNbp = cfgNbpArg;
-    var seqDom = {1..0};
-    var finalSeq: [seqDom] string;
-    var coordDom = {1..3, 1..0, 1..0};
-    var coords: [coordDom] real;
-    var numFrames = 0;
-
-    if cfgStrandsType != 0 && cfgTop != "" {
-      writeln("Reading topology file");
-      var (origNbp, nAtoms, box, origSeq, ringIndices) =
-        topologyAmber(cfgTop, cfgStrandsType);
-
-      writeln("Reading trajectory file");
-      var atomsToRead = if cfgTraj.endsWith(".xyz") then origNbp else nAtoms;
-      var (rawCoords, frames) = coordinatesOther(cfgTraj, atomsToRead);
-      actualNbp = origNbp;
-      numFrames = frames;
-      coordDom = rawCoords.domain;
-      coords = rawCoords;
-      seqDom = {1..actualNbp};
-      finalSeq = origSeq[0..actualNbp-1];
-    } else {
-      writeln("Reading trajectory file (no topology)");
-      if actualNbp <= 0 then
-        halt("Must specify --nbpArg since no topology is provided");
-      var (rawCoords, fn) = coordinatesOther(cfgTraj, actualNbp);
-      numFrames = fn;
-      coordDom = rawCoords.domain;
-      coords = rawCoords;
-      var arr: [1..actualNbp] string;
-      for i in 1..actualNbp do arr[i] = "X";
-      seqDom = {1..actualNbp};
-      finalSeq = arr;
-    }
-
-    if !cfgIsCircular && cfgTLength > actualNbp - 2 then
-      halt("Tangent length must be less than N-2 for opened structures");
-    if cfgIsCircular && cfgTLength > actualNbp - 1 then
-      halt("Tangent length must be less than N-1 for closed structures");
-
-    var ndim = actualNbp - 1;
-    var mdim = ndim * (ndim - 1) / 2;
-    var nldim = actualNbp - cfgTLength;
-    var mldim = nldim * (nldim - 1) / 2;
-    if cfgIsCircular { mdim = actualNbp; }
-
-    // Parse bpFitting: "0" or empty means use all base-pairs;
-    // otherwise it is a comma-separated list of 1-based indices.
-    var bpFittingDom = {1..0};
-    var bp_fitting_arr: [bpFittingDom] int;
-    var n_fitting = 0;
-    if cfgBpFitting != "0" && cfgBpFitting != "" {
-      var idxList: list(int);
-      for tok in cfgBpFitting.split(",") {
-        var idx = tok.strip():int;
-        if idx >= 1 && idx <= actualNbp then idxList.pushBack(idx);
+      // Load config file values as defaults (CLI flags override them).
+      var cfgTop = top,
+        cfgTraj = traj,
+        cfgIsCircular = isCircular,
+        cfgStrandsType = strandsType,
+        cfgNbpArg = nbpArg,
+        cfgFitplane = fitplane,
+        cfgBpFitting = bpFitting,
+        cfgTLength = tLength,
+        cfgPrintProj = printProj,
+        cfgXyzFormat = xyzFormat;
+  
+      if configFile != "" {
+        var cfg = parseConfigFile(configFile);
+        // Config values serve as defaults; CLI flags always win.
+        if top == "" then
+          cfgTop = cfg.get("top", cfgTop);
+        if traj == "" then
+          cfgTraj = cfg.get("traj", cfgTraj);
+        if !isCircular && cfg.contains("isCircular") then
+          cfgIsCircular = cfg["isCircular"] == "true";
+        if strandsType == 1 && cfg.contains("strandsType") then
+          cfgStrandsType = cfg["strandsType"]:int;
+        if nbpArg == 0 && cfg.contains("nbpArg") then
+          cfgNbpArg = cfg["nbpArg"]:int;
+        if fitplane && cfg.contains("fitplane") then
+          cfgFitplane = cfg["fitplane"] == "true";
+        if bpFitting == "0" then
+          cfgBpFitting = cfg.get("bpFitting", cfgBpFitting);
+        if tLength == 1 && cfg.contains("tLength") then
+          cfgTLength = cfg["tLength"]:int;
+        if !printProj && cfg.contains("printProj") then
+          cfgPrintProj = cfg["printProj"] == "true";
+        if !xyzFormat && cfg.contains("xyzFormat") then
+          cfgXyzFormat = cfg["xyzFormat"] == "true";
       }
-      if idxList.size > 0 {
-        bpFittingDom = {1..idxList.size};
-        for i in 1..idxList.size do bp_fitting_arr[i] = idxList[i-1];
-        n_fitting = bpFittingDom.size;
+  
+      if cfgTraj == "" {
+        writeln(
+          "Trajectory file must be specified using --traj=<file>" +
+          " or via --configFile=<file>");
+        return;
       }
-    }
-
-    // ---------------------------------------------------------------
-    // PLANE SECTION
-    // Fortran: allocate G_n, best, avg/max_dist_frame, project,
-    //          then deallocate(bp_fitting).
-    // Each array gets its own named domain so it can be freed
-    // independently, mirroring Fortran's per-variable deallocate().
-    // ---------------------------------------------------------------
-    var gnDom = {1..3, 1..3, 1..numFrames};
-    var G_n: [gnDom] real;
-    var bestDom = {1..numFrames};
-    var best: [bestDom] int;
-    var distDom = {1..numFrames};
-    var avg_dist_frame: [distDom] real;
-    var max_dist_frame: [distDom] real;
-
-    if cfgFitplane {
-      writeln("Fitting planes");
-      var res = projectCoordinatesGPlane(
-        coords, n_fitting, bp_fitting_arr);
-      G_n = res(0);
-      best = res(1);
-      avg_dist_frame = res(2);
-      max_dist_frame = res(3);
-      if cfgPrintProj then
-        writeProjectedCoords(
-          coords, G_n, best, finalSeq, cfgXyzFormat);
-    }
-    // Fortran: deallocate(bp_fitting)
-    bpFittingDom = {1..0};
-
-    // ---------------------------------------------------------------
-    // WIDTH, HEIGHT AND ASPECT RATIO SECTION
-    // Fortran: allocate width/height/aratio, compute.
-    // ---------------------------------------------------------------
-    var widthDom = {1..numFrames};
-    var width: [widthDom] real;
-    var heightDom = {1..numFrames};
-    var height: [heightDom] real;
-    var aratioDom = {1..numFrames};
-    var aspect_ratio: [aratioDom] real;
-
-    if cfgFitplane {
-      writeln("Calculating widths, heights and aspect ratios");
+  
+      // Use named domains so that we can reassign them to empty ranges
+      // to release memory, mirroring Fortran's deallocate() calls.
+      var actualNbp = cfgNbpArg;
+      var seqDom = {1..0};
+      var finalSeq: [seqDom] string;
+      var coordDom = {1..3, 1..0, 1..0};
+      var coords: [coordDom] real;
+      var numFrames = 0;
+  
+      if cfgStrandsType != 0 && cfgTop != "" {
+        writeln("Reading topology file");
+        var (origNbp, nAtoms, box, origSeq, ringIndices) =
+          topologyAmber(cfgTop, cfgStrandsType);
+  
+        writeln("Reading trajectory file");
+        var atomsToRead = if cfgTraj.endsWith(".xyz") 
+                          then origNbp else nAtoms;
+        var (rawCoords, frames) = coordinatesOther(cfgTraj, atomsToRead);
+        actualNbp = origNbp;
+        numFrames = frames;
+        coordDom = rawCoords.domain;
+        coords = rawCoords;
+        seqDom = {1..actualNbp};
+        finalSeq = origSeq[0..actualNbp-1];
+      } else {
+        writeln("Reading trajectory file (no topology)");
+        if actualNbp <= 0 then
+          halt("Must specify --nbpArg since no topology is provided");
+        var (rawCoords, fn) = coordinatesOther(cfgTraj, actualNbp);
+        numFrames = fn;
+        coordDom = rawCoords.domain;
+        coords = rawCoords;
+        var arr: [1..actualNbp] string;
+        for i in 1..actualNbp do arr[i] = "X";
+        seqDom = {1..actualNbp};
+        finalSeq = arr;
+      }
+  
+      if !cfgIsCircular && cfgTLength > actualNbp - 2 then
+        halt("Tangent length must be less than N-2 for opened structures");
+      if cfgIsCircular && cfgTLength > actualNbp - 1 then
+        halt("Tangent length must be less than N-1 for closed structures");
+  
+      var ndim = actualNbp - 1;
+      var mdim = ndim * (ndim - 1) / 2;
+      var nldim = actualNbp - cfgTLength;
+      var mldim = nldim * (nldim - 1) / 2;
+      if cfgIsCircular { mdim = actualNbp; }
+  
+      // Parse bpFitting: "0" or empty means use all base-pairs;
+      // otherwise it is a comma-separated list of 1-based indices.
+      var bpFittingDom = {1..0};
+      var bpFittingArr: [bpFittingDom] int;
+      var nFitting = 0;
+      if cfgBpFitting != "0" && cfgBpFitting != "" {
+        var idxList: list(int);
+        for tok in cfgBpFitting.split(",") {
+          var idx = tok.strip():int;
+          if idx >= 1 && idx <= actualNbp then idxList.pushBack(idx);
+        }
+        if idxList.size > 0 {
+          bpFittingDom = {1..idxList.size};
+          for i in 1..idxList.size do bpFittingArr[i] = idxList[i-1];
+          nFitting = bpFittingDom.size;
+        }
+      }
+  
+      // ---------------------------------------------------------------
+      // PLANE SECTION
+      // Fortran: allocate G_n, best, avg/max_dist_frame, project,
+      //          then deallocate(bp_fitting).
+      // Each array gets its own named domain so it can be freed
+      // independently, mirroring Fortran's per-variable deallocate().
+      // ---------------------------------------------------------------
+      var gnDom = {1..3, 1..3, 1..numFrames};
+      var G_n: [gnDom] real;
+      var bestDom = {1..numFrames};
+      var best: [bestDom] int;
+      var distDom = {1..numFrames};
+      var avgDistFrame, maxDistFrame: [distDom] real;
+  
+      if cfgFitplane {
+        writeln("Fitting planes");
+        var res = projectCoordinatesGPlane(
+          coords, nFitting, bpFittingArr);
+        G_n = res(0);
+        best = res(1);
+        avgDistFrame = res(2);
+        maxDistFrame = res(3);
+        if cfgPrintProj then
+          writeProjectedCoords(
+            coords, G_n, best, finalSeq, cfgXyzFormat);
+      }
+      // Fortran: deallocate(bp_fitting)
+      bpFittingDom = {1..0};
+  
+      // ---------------------------------------------------------------
+      // WIDTH, HEIGHT AND ASPECT RATIO SECTION
+      // Fortran: allocate width/height/aratio, compute.
+      // ---------------------------------------------------------------
+      var widthDom = {1..numFrames};
+      var width: [widthDom] real;
+      var heightDom = {1..numFrames};
+      var height: [heightDom] real;
+      var aratioDom = {1..numFrames};
+      var aspectRatio: [aratioDom] real;
+  
+      if cfgFitplane {
+        writeln("Calculating widths, heights and aspect ratios");
+        if cfgIsCircular {
+          (width, height, aspectRatio) =
+            getCWidthHeightAratio(mdim, numFrames, G_n, best, coords);
+        } else {
+          (width, height, aspectRatio) =
+            getWidthHeightAratio(ndim, mdim, numFrames,
+                                G_n, best, coords);
+        }
+      }
+  
+      // ---------------------------------------------------------------
+      // TANGENT VECTORS SECTION
+      // Fortran: compute tangents, then deallocate(coords).
+      // ---------------------------------------------------------------
+      writeln("Calculating tangent vectors");
+      var tangentsN = if cfgIsCircular then actualNbp else nldim;
+      var tangentsDom = {1..3, 1..tangentsN, 1..numFrames};
+      var tangents: [tangentsDom] real;
+      tangents = getTangentVectors(coords, cfgIsCircular, cfgTLength);
+  
+      // Fortran line 311-313: deallocate(coords) — no longer needed
+      coordDom = {1..3, 1..0, 1..0};
+  
+      // ---------------------------------------------------------------
+      // BENDINGS + RELATIVE SIZES + AVERAGES + WRITING
+      //
+      // The circular and non-circular paths use completely different
+      // array shapes (c_bends vs bends). In the Fortran, these are
+      // conditionally allocated. In Chapel, we use block scoping so
+      // only the needed array is ever instantiated. This avoids the
+      // catastrophic O(F*N^4) c_bends allocation in the non-circular
+      // case (and vice-versa).
+      //
+      // The relative sizes, averaging, and writing stages are placed
+      // inside the same branch so they can reference the scoped arrays
+      // and so all per-frame data is freed when the branch scope exits.
+      // This mirrors the Fortran's deallocate() ordering exactly.
+      // ---------------------------------------------------------------
+      writeln("Calculating bending angles");
+  
       if cfgIsCircular {
-        (width, height, aspect_ratio) =
-          getCWidthHeightAratio(mdim, numFrames, G_n, best, coords);
+        // c_bends: [1..F, 1..nbp, 1..nbp-1] — O(F*N^2), reasonable
+        var cBends: [1..numFrames, 1..mdim, 1..mdim-1] real;
+        if cfgFitplane {
+          cBends = getCBendings(mdim, numFrames, G_n, best, tangents);
+        } else {
+          cBends = getCBendingsNofit(mdim, numFrames, tangents);
+        }
+        // tangents, G_n, best no longer needed — freed at scope exit
+  
+        // Relative sizes
+        if cfgFitplane {
+          var avgDistRelFrame: [1..numFrames] real;
+          var maxDistRelFrame: [1..numFrames] real;
+          for i in 1..numFrames {
+            avgDistRelFrame[i] = 100.0 * (avgDistFrame[i] / height[i]);
+            maxDistRelFrame[i] = 100.0 * (maxDistFrame[i] / height[i]);
+          }
+  
+          // Averages
+          writeln("Calculating averages and standard deviations");
+          var cAvstdBends: [1..2, 1..mdim, 1..mdim-1] real;
+          forall (i, l) in {1..mdim, 1..mdim-1} {
+            var res = averageStd(cBends[1..numFrames, i, l]);
+            cAvstdBends[1, i, l] = res[1];
+            cAvstdBends[2, i, l] = res[2];
+          }
+  
+          var avstdWidth = averageStd(width);
+          var avstdHeight = averageStd(height);
+          var avstdAratio = averageStd(aspectRatio);
+          var avgDist = averageStd(avgDistFrame);
+          var maxDist = averageStd(maxDistFrame);
+          var avgDistRel = averageStd(avgDistRelFrame);
+          var maxDistRel = averageStd(maxDistRelFrame);
+  
+          // Write
+          writeln("Writing output modules");
+          writeCAvParms(actualNbp, numFrames, finalSeq,
+                        cAvstdBends, avstdWidth, avstdHeight, avstdAratio,
+                        cfgTLength, avgDist, maxDist,
+                        avgDistRel, maxDistRel);
+        } else {
+          // No fitplane: only bendings
+          writeln("Calculating averages and standard deviations");
+          var cAvstdBends: [1..2, 1..mdim, 1..mdim-1] real;
+          forall (i, l) in {1..mdim, 1..mdim-1} {
+            var res = averageStd(cBends[1..numFrames, i, l]);
+            cAvstdBends[1, i, l] = res[1];
+            cAvstdBends[2, i, l] = res[2];
+          }
+  
+          writeln("Writing output modules");
+          writeCAvBends(
+            actualNbp, numFrames, finalSeq, cAvstdBends, cfgTLength);
+        }
       } else {
-        (width, height, aspect_ratio) =
-          getWidthHeightAratio(ndim, mdim, numFrames,
-                              G_n, best, coords);
+        // bends: [1..F, 1..mldim] — O(F*N^2/2), manageable
+        var bends: [1..numFrames, 1..mldim] real;
+        if cfgFitplane {
+          bends = getBendings(nldim, numFrames, G_n, best, tangents, mldim);
+        } else {
+          bends = getBendingsNofit(nldim, numFrames, tangents, mldim);
+        }
+        // tangents, G_n, best no longer needed — freed at scope exit
+  
+        // Relative sizes
+        if cfgFitplane {
+          var avgDistRelFrame: [1..numFrames] real;
+          var maxDistRelFrame: [1..numFrames] real;
+          for i in 1..numFrames {
+            avgDistRelFrame[i] = 100.0 * (avgDistFrame[i] / height[i]);
+            maxDistRelFrame[i] = 100.0 * (maxDistFrame[i] / height[i]);
+          }
+  
+          // Averages
+          writeln("Calculating averages and standard deviations");
+          var avstdBends: [1..2, 1..mldim] real;
+          forall i in 1..mldim {
+            var res = averageStd(bends[1..numFrames, i]);
+            avstdBends[1, i] = res[1];
+            avstdBends[2, i] = res[2];
+          }
+  
+          var avstdWidth = averageStd(width);
+          var avstdHeight = averageStd(height);
+          var avstdAratio = averageStd(aspectRatio);
+          var avgDist = averageStd(avgDistFrame);
+          var maxDist = averageStd(maxDistFrame);
+          var avgDistRel = averageStd(avgDistRelFrame);
+          var maxDistRel = averageStd(maxDistRelFrame);
+  
+          // Write
+          writeln("Writing output modules");
+          writeAvParms(actualNbp, nldim, numFrames, finalSeq,
+                       avstdBends, avstdWidth, avstdHeight, avstdAratio,
+                       cfgTLength, avgDist, maxDist,
+                       avgDistRel, maxDistRel);
+        } else {
+          // No fitplane: only bendings
+          writeln("Calculating averages and standard deviations");
+          var avstdBends: [1..2, 1..mldim] real;
+          forall i in 1..mldim {
+            var res = averageStd(bends[1..numFrames, i]);
+            avstdBends[1, i] = res[1];
+            avstdBends[2, i] = res[2];
+          }
+  
+          writeln("Writing output modules");
+          writeAvBends(actualNbp, nldim, numFrames,
+                       finalSeq, avstdBends, cfgTLength);
+        }
       }
-    }
-
-    // ---------------------------------------------------------------
-    // TANGENT VECTORS SECTION
-    // Fortran: compute tangents, then deallocate(coords).
-    // ---------------------------------------------------------------
-    writeln("Calculating tangent vectors");
-    var tangents_n = if cfgIsCircular then actualNbp else nldim;
-    var tangentsDom = {1..3, 1..tangents_n, 1..numFrames};
-    var tangents: [tangentsDom] real;
-    tangents = getTangentVectors(coords, cfgIsCircular, cfgTLength);
-
-    // Fortran line 311-313: deallocate(coords) — no longer needed
-    coordDom = {1..3, 1..0, 1..0};
-
-    // ---------------------------------------------------------------
-    // BENDINGS + RELATIVE SIZES + AVERAGES + WRITING
-    //
-    // The circular and non-circular paths use completely different
-    // array shapes (c_bends vs bends). In the Fortran, these are
-    // conditionally allocated. In Chapel, we use block scoping so
-    // only the needed array is ever instantiated. This avoids the
-    // catastrophic O(F*N^4) c_bends allocation in the non-circular
-    // case (and vice-versa).
-    //
-    // The relative sizes, averaging, and writing stages are placed
-    // inside the same branch so they can reference the scoped arrays
-    // and so all per-frame data is freed when the branch scope exits.
-    // This mirrors the Fortran's deallocate() ordering exactly.
-    // ---------------------------------------------------------------
-    writeln("Calculating bending angles");
-
-    if cfgIsCircular {
-      // c_bends: [1..F, 1..nbp, 1..nbp-1] — O(F*N^2), reasonable
-      var c_bends: [1..numFrames, 1..mdim, 1..mdim-1] real;
-      if cfgFitplane {
-        c_bends = getCBendings(mdim, numFrames, G_n, best, tangents);
-      } else {
-        c_bends = getCBendingsNofit(mdim, numFrames, tangents);
-      }
-      // tangents, G_n, best no longer needed — freed at scope exit
-
-      // Relative sizes
-      if cfgFitplane {
-        var avg_dist_rel_frame: [1..numFrames] real;
-        var max_dist_rel_frame: [1..numFrames] real;
-        for i in 1..numFrames {
-          avg_dist_rel_frame[i] = 100.0 * (avg_dist_frame[i] / height[i]);
-          max_dist_rel_frame[i] = 100.0 * (max_dist_frame[i] / height[i]);
-        }
-
-        // Averages
-        writeln("Calculating averages and standard deviations");
-        var c_avstd_bends: [1..2, 1..mdim, 1..mdim-1] real;
-        forall (i, l) in {1..mdim, 1..mdim-1} {
-          var res = averageStd(c_bends[1..numFrames, i, l]);
-          c_avstd_bends[1, i, l] = res[1];
-          c_avstd_bends[2, i, l] = res[2];
-        }
-
-        var avstd_width = averageStd(width);
-        var avstd_height = averageStd(height);
-        var avstd_aratio = averageStd(aspect_ratio);
-        var avg_dist = averageStd(avg_dist_frame);
-        var max_dist = averageStd(max_dist_frame);
-        var avg_dist_rel = averageStd(avg_dist_rel_frame);
-        var max_dist_rel = averageStd(max_dist_rel_frame);
-
-        // Write
-        writeln("Writing output modules");
-        writeCAvParms(actualNbp, numFrames, finalSeq,
-                      c_avstd_bends, avstd_width, avstd_height, avstd_aratio,
-                      cfgTLength, avg_dist, max_dist,
-                      avg_dist_rel, max_dist_rel);
-      } else {
-        // No fitplane: only bendings
-        writeln("Calculating averages and standard deviations");
-        var c_avstd_bends: [1..2, 1..mdim, 1..mdim-1] real;
-        forall (i, l) in {1..mdim, 1..mdim-1} {
-          var res = averageStd(c_bends[1..numFrames, i, l]);
-          c_avstd_bends[1, i, l] = res[1];
-          c_avstd_bends[2, i, l] = res[2];
-        }
-
-        writeln("Writing output modules");
-        writeCAvBends(
-          actualNbp, numFrames, finalSeq, c_avstd_bends, cfgTLength);
-      }
-    } else {
-      // bends: [1..F, 1..mldim] — O(F*N^2/2), manageable
-      var bends: [1..numFrames, 1..mldim] real;
-      if cfgFitplane {
-        bends = getBendings(nldim, numFrames, G_n, best, tangents, mldim);
-      } else {
-        bends = getBendingsNofit(nldim, numFrames, tangents, mldim);
-      }
-      // tangents, G_n, best no longer needed — freed at scope exit
-
-      // Relative sizes
-      if cfgFitplane {
-        var avg_dist_rel_frame: [1..numFrames] real;
-        var max_dist_rel_frame: [1..numFrames] real;
-        for i in 1..numFrames {
-          avg_dist_rel_frame[i] = 100.0 * (avg_dist_frame[i] / height[i]);
-          max_dist_rel_frame[i] = 100.0 * (max_dist_frame[i] / height[i]);
-        }
-
-        // Averages
-        writeln("Calculating averages and standard deviations");
-        var avstd_bends: [1..2, 1..mldim] real;
-        forall i in 1..mldim {
-          var res = averageStd(bends[1..numFrames, i]);
-          avstd_bends[1, i] = res[1];
-          avstd_bends[2, i] = res[2];
-        }
-
-        var avstd_width = averageStd(width);
-        var avstd_height = averageStd(height);
-        var avstd_aratio = averageStd(aspect_ratio);
-        var avg_dist = averageStd(avg_dist_frame);
-        var max_dist = averageStd(max_dist_frame);
-        var avg_dist_rel = averageStd(avg_dist_rel_frame);
-        var max_dist_rel = averageStd(max_dist_rel_frame);
-
-        // Write
-        writeln("Writing output modules");
-        writeAvParms(actualNbp, nldim, numFrames, finalSeq,
-                     avstd_bends, avstd_width, avstd_height, avstd_aratio,
-                     cfgTLength, avg_dist, max_dist,
-                     avg_dist_rel, max_dist_rel);
-      } else {
-        // No fitplane: only bendings
-        writeln("Calculating averages and standard deviations");
-        var avstd_bends: [1..2, 1..mldim] real;
-        forall i in 1..mldim {
-          var res = averageStd(bends[1..numFrames, i]);
-          avstd_bends[1, i] = res[1];
-          avstd_bends[2, i] = res[2];
-        }
-
-        writeln("Writing output modules");
-        writeAvBends(actualNbp, nldim, numFrames,
-                     finalSeq, avstd_bends, cfgTLength);
-      }
-    }
-    // All per-frame arrays (bends/c_bends, width, height, etc.)
-    // are now out of scope and freed.
+      // All per-frame arrays (bends/c_bends, width, height, etc.)
+      // are now out of scope and freed.
     }
   }
-}
+  }

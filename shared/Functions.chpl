@@ -64,9 +64,9 @@ module Functions {
   // Matrix-matrix multiply: A * B
   proc mat3Mul(a: mat3, b: mat3): mat3 {
     // Columns of B
-    var b0 = mkVec3(b(0)(0), b(1)(0), b(2)(0));
-    var b1 = mkVec3(b(0)(1), b(1)(1), b(2)(1));
-    var b2 = mkVec3(b(0)(2), b(1)(2), b(2)(2));
+    var b0 = mkVec3(b(0)(0), b(1)(0), b(2)(0)),
+        b1 = mkVec3(b(0)(1), b(1)(1), b(2)(1)),
+        b2 = mkVec3(b(0)(2), b(1)(2), b(2)(2));
     return ((vec3Dot(a(0), b0), vec3Dot(a(0), b1), vec3Dot(a(0), b2)),
             (vec3Dot(a(1), b0), vec3Dot(a(1), b1), vec3Dot(a(1), b2)),
             (vec3Dot(a(2), b0), vec3Dot(a(2), b1), vec3Dot(a(2), b2)));
@@ -86,7 +86,7 @@ module Functions {
   proc averageStd(X: [] real) {
     var n = X.size;
     var res: [1..2] real;
-    
+
     // Get Average
     res[1] = + reduce(X) / n:real;
 
@@ -130,9 +130,9 @@ module Functions {
   /* General rotation matrix R of magnitude 'a' about unit vector 'u' */
   proc generalRotationMatrix(u: [1..3] real, a: real) {
     var R: [1..3, 1..3] real;
-    var ca = cos(a);
-    var sa = sin(a);
-    var omca = 1.0 - ca;
+    var ca = cos(a),
+        sa = sin(a),
+        omca = 1.0 - ca;
 
     R[1,1] = ca + omca * u[1]**2;
     R[1,2] = omca * u[1] * u[2] - u[3] * sa;
@@ -180,9 +180,9 @@ module Functions {
         th = 0.5 * atan(2.0 * S[i,j] / (S[j,j] - S[i,i]));
       }
 
-      var co = cos(th);
-      var si = sin(th);
-      
+      var co = cos(th),
+          si = sin(th);
+
       var G: [1..ndim, 1..ndim] real;
       for k in 1..ndim do G[k,k] = 1.0;
       G[i,i] = co;
@@ -441,9 +441,9 @@ module Functions {
         th = 0.5 * atan(2.0 * S(i)(j) / (S(j)(j) - S(i)(i)));
       }
 
-      var co = cos(th);
-      var si = sin(th);
-      
+      var co = cos(th),
+          si = sin(th);
+
       // V = V * G (optimized)
       for rIdx in 0..3 {
         var row = V(rIdx);
@@ -489,8 +489,7 @@ module Functions {
 
   /* Orientation matrix R and origin vector O of a base (optimized) */
   proc getRotationROriginO(Ex: [] real, St: [] real) {
-    var av_Ex: vec3 = (0.0, 0.0, 0.0);
-    var av_St: vec3 = (0.0, 0.0, 0.0);
+    var av_Ex, av_St: vec3 = (0.0, 0.0, 0.0);
 
     var N_val = Ex.dim(1).size;
     var N_inv = 1.0 / N_val:real;
@@ -530,7 +529,7 @@ module Functions {
     var (S, V) = diagonalizationJacobi4(M);
     var q = largestEigenvec4(S, V);
     var tR = getRotationRTuple(q);
-    
+
     var R: [1..3, 1..3] real;
     for i in 0..2 do
       for j in 0..2 do
@@ -687,14 +686,15 @@ module Functions {
                           mkVec3(T1(0)(1), T1(1)(1), T1(2)(1)));
     BPP[6] = acos(clamp(dotT2T1, -1.0, 1.0));
     
-    var h = vec3Cross(mkVec3(T2(0)(1), T2(1)(1), T2(2)(1)),
-                      mkVec3(T1(0)(1), T1(1)(1), T1(2)(1)));
-    if vec3Dot(h, col2) < 0.0 then BPP[6] = -BPP[6];
+    BPP[6] = if vec3Dot(vec3Cross(mkVec3(T2(0)(1), T2(1)(1), T2(2)(1)),
+                                  mkVec3(T1(0)(1), T1(1)(1), T1(2)(1))),
+                                  col2) < 0.0
+             then -BPP[6]
+             else BPP[6];
 
-    var psi = acos(clamp(vec3Dot(bp, col1), -1.0, 1.0));
-    h = vec3Cross(bp, col1);
-    if vec3Dot(h, col2) < 0.0 then psi = -psi;
-
+    var psi = if vec3Dot(vec3Cross(bp, col1), col2) < 0.0
+              then -acos(clamp(vec3Dot(bp, col1), -1.0, 1.0))
+              else  acos(clamp(vec3Dot(bp, col1), -1.0, 1.0));
     BPP[5] = delta * cos(psi);
     BPP[4] = delta * sin(psi);
 
@@ -723,7 +723,7 @@ module Functions {
                     (R2in[3,1], R2in[3,2], R2in[3,3]));
 
     var BSP: [1..9] real;
-    
+
     // row 3 is index 2
     var R1_3 = mkVec3(R1(0)(2), R1(1)(2), R1(2)(2));
     var R2_3 = mkVec3(R2(0)(2), R2(1)(2), R2(2)(2));
@@ -773,7 +773,7 @@ module Functions {
 
     BSP[4] = BSP[7] * sin(phi);
     BSP[5] = BSP[7] * cos(phi);
-    
+
     var dO = vec3Sub(O2, O1);
     BSP[1] = vec3Dot(dO, col0);
     BSP[2] = vec3Dot(dO, col1);
