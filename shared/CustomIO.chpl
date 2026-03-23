@@ -9,6 +9,18 @@ module CustomIO {
   use IO;
   use List;
   use FileSystem;
+  
+  proc padLeft(s: string, width: int): string {
+    const len = s.numBytes;
+    if len >= width then return s;
+    return " " * (width - len) + s;
+  }
+  
+  proc padRight(s: string, width: int): string {
+    const len = s.numBytes;
+    if len >= width then return s;
+    return s + " " * (width - len);
+  }
 
   /* 
    * Reads topology file from AMBER topology format.
@@ -123,14 +135,8 @@ module CustomIO {
 
       // Extract ring atoms indices
       var ringIndices: list(int);
-      // For XYZ files from WrLINE, we only want the first nbp sequence elements
-      // if we are treating the trajectory as having one point per bp step.
       var finalSeqList: list(string);
-      if strandsType == 2 {
-        for i in 0..nbp-1 do finalSeqList.pushBack(rawSeq[i]);
-      } else {
-        for i in 0..rawSeq.size-1 do finalSeqList.pushBack(rawSeq[i]);
-      }
+      for i in 0..rawSeq.size-1 do finalSeqList.pushBack(rawSeq[i]);
 
       for i in 0..rawSeq.size-1 {
         var s1 = rawResPointers[i];
@@ -165,14 +171,17 @@ module CustomIO {
           }
         }
       }
-
-      return (nbp, nAtoms, box, finalSeqList.toArray(), ringIndices.toArray());
+      var retSeq: [1..rawSeq.size] string;
+      for i in 1..rawSeq.size do retSeq[i] = rawSeq[i-1];
+      var retRing: [1..ringIndices.size] int;
+      for i in 1..ringIndices.size do retRing[i] = ringIndices[i-1];
+      return (nbp, nAtoms, box, retSeq, retRing);
     }
   }
 
   /*
    * Reads atom coordinates from AMBER trajectory format (.crd / .x).
-   * Supports both open and closed structures.
+   * Emulates Fortran line-based reading with 10F8.3 format.
    */
   proc coordinatesAmberCrd(trajPath: string, nAtoms: int, nbp: int,
                              boxPresent: int, strandsType: int,
@@ -185,27 +194,55 @@ module CustomIO {
       var header: string;
       reader.readLine(header);
 
-      // Determine frames
       var framesList: list([1..3, 1..nAtoms] real);
       
+      const totalCoords = 3 * nAtoms;
+      const coordsPerLine = 10;
+      const linesPerFrame = ceil(totalCoords:real / coordsPerLine):int;
+
       try {
         while true {
           var frame: [1..3, 1..nAtoms] real;
+          var flatCoords: [1..totalCoords] real;
+          var cCount = 0;
+          
+          for l in 1..linesPerFrame {
+            var line: string;
+            if !reader.readLine(line) then break;
+            
+            // Each line has up to 10 floats in F8.3 format
+            for i in 0..9 {
+              var start = i * 8;
+              if start + 8 > line.numBytes then break;
+              var s = line[start..start+7].strip();
+              if s == "" then continue;
+              cCount += 1;
+              if cCount <= totalCoords then flatCoords[cCount] = s:real;
+            }
+          }
+          
+          if cCount < totalCoords then break;
+
+          // Reshape flat coordinates into frame array
           for i in 1..nAtoms {
-            for j in 1..3 do frame[j, i] = reader.read(real);
+            for j in 1..3 do frame[j, i] = flatCoords[(i-1)*3 + j];
           }
+
+          // Skip box line if present according to topology
           if boxPresent != 0 {
-            for 1..3 do reader.read(real); // Skip box dimensions
+            var dummy: string;
+            reader.readLine(dummy);
           }
+          
           framesList.pushBack(frame);
         }
       } catch {
-        // End of file
+        // End of file or read error
       }
       f.close();
 
       var numFrames = framesList.size;
-      
+
       // Filter coordinates to ring atoms and handle open structure ends
       var startBp = 1,
           endBp = nbp,
@@ -223,10 +260,15 @@ module CustomIO {
         else rAtomsPerStrand += 6;
       }
 
-      var totalRAtoms = if strandsType == 2 
-                          then 2 * rAtomsPerStrand 
-                          else rAtomsPerStrand;
+      var totalRAtoms = rAtomsPerStrand;
+      if strandsType == 2 {
+        for i in startBp..endBp {
+          if seq[nbp + i] == "A" || seq[nbp + i] == "G" then totalRAtoms += 9;
+          else totalRAtoms += 6;
+        }
+      }
       var filteredCoords: [1..3, 1..totalRAtoms, 1..numFrames] real;
+      var framesArr = framesList.toArray();
 
       forall k in 1..numFrames {
         var l = 0;
@@ -245,7 +287,7 @@ module CustomIO {
           for 1..atomsInBase {
             l += 1;
             var atomIdx = ringIndices[ringPtr];
-            filteredCoords[1..3, l, k] = framesList[k][1..3, atomIdx];
+            filteredCoords[1..3, l, k] = framesArr[k-1][1..3, atomIdx];
             ringPtr += 1;
           }
         }
@@ -272,7 +314,7 @@ module CustomIO {
             for 1..atomsInBase {
               l += 1;
               var atomIdx = ringIndices[ringPtr2];
-              filteredCoords[1..3, l, k] = framesList[k][1..3, atomIdx];
+              filteredCoords[1..3, l, k] = framesArr[k-1][1..3, atomIdx];
               ringPtr2 += 1;
             }
           }
@@ -284,14 +326,13 @@ module CustomIO {
       if strandsType == 2 {
         for i in startBp..endBp do finalSeq.pushBack(seq[nbp + i]);
       }
+      var retSeq: [1..finalSeq.size] string;
+      for i in 1..finalSeq.size do retSeq[i] = finalSeq[i-1];
 
-      return (filteredCoords, numFrames, actualNbp, finalSeq.toArray());
+      return (filteredCoords, numFrames, actualNbp, retSeq);
     }
   }
 
-  /* 
-   * Reads 3-column coordinates (.3col) or XYZ format (.xyz) 
-   */
   proc coordinatesOther(path: string, nAtoms: int) {
     try! {
       // First pass: count frames
@@ -302,11 +343,12 @@ module CustomIO {
       try {
         while true {
           if isXyz {
-            r1.read(int);
-            r1.readLine();
+            var n: int;
+            if !r1.read(n) then break;
+            r1.readLine(); // skip comment
           }
           for 1..nAtoms {
-            if isXyz then r1.read(string);
+            if isXyz then r1.read(string); // atom name
             for 1..3 do r1.read(real);
           }
           numFrames += 1;
@@ -594,8 +636,8 @@ module CustomIO {
       writer.writeln(if strandsType == 2
                      then "DOUBLE-STRANDED STRUCTURE ANALYSED"
                      else "SINGLE-STRANDED STRUCTURE ANALYSED");
-      writer.writef("BASE-PAIRS: %d\n", nbp);
-      writer.writef("FRAMES:     %d\n", numFrames);
+      writer.writef("BASE-PAIRS: %i\n", nbp);
+      writer.writef("FRAMES:     %i\n", numFrames);
       writer.writeln("SEQUENCE:   ");
       writer.write("STRAND 1:   ");
       for i in 1..nbp do writer.write(seq[i]);
@@ -609,24 +651,29 @@ module CustomIO {
       writer.writeln(
         "First column averages, second column standard deviations"
       );
-      writer.writef("%-10s %20s %20s %20s %20s %20s %20s\n", " base-pair",
-                    "Shear", "Stretch", "Stagger", "Buckle", "Propeller",
-                    "Opening");
+      var header = padRight(" base-pair", 10) + " " +
+                   padLeft("Shear", 20) + " " +
+                   padLeft("Stretch", 20) + " " +
+                   padLeft("Stagger", 20) + " " +
+                   padLeft("Buckle", 20) + " " +
+                   padLeft("Propeller", 20) + " " +
+                   padLeft("Opening", 20);
+      writer.writeln(header);
       writer.writeln("-" * 130);
       
       for i in 1..nbp {
         var s2 = if strandsType == 2 then seq[2*nbp - i + 1] else "";
         var sep = if strandsType == 2 then "-" else " ";
-        writer.writef("%6d %s %s%s%s", i, " ", seq[i], sep, s2);
+        writer.writef("%6i %s %s%s%s", i, " ", seq[i], sep, s2);
         for p in 1..6 {
-          writer.writef("%10.3f%10.3f", BPP[1, p, i], BPP[2, p, i]);
+          writer.writef("%10.3r%10.3r", BPP[1, p, i], BPP[2, p, i]);
         }
         writer.writeln();
       }
       writer.writeln("-" * 130);
       writer.write(" AVG-STD= ");
       for p in 1..6 {
-        writer.writef("%10.3f%10.3f", ovBpp[1, p], ovBpp[2, p]);
+        writer.writef("%10.3r%10.3r", ovBpp[1, p], ovBpp[2, p]);
       }
       writer.writeln();
       writer.close();
@@ -657,8 +704,7 @@ module CustomIO {
       }
       writer.writeln("\n\nFirst column averages, " + 
                      "second column standard deviations");
-      writer.writef(F_BSP_1, " base-step ", "Shift", "Slide", "Rise", "Tilt", 
-                    "Roll", "Twist", "Bending");
+      writer.write("      base-step                Shift               Slide                Rise                Tilt                Roll               Twist             Bending\n");
       writer.writeln("-" * 130);
       
       var l = 0;
@@ -668,18 +714,17 @@ module CustomIO {
           l += 1;
           var s2_1 = if strandsType == 2 then seq[2*nbp-w+1] else "#";
           var s2_2 = if strandsType == 2 then seq[2*nbp-i+1] else "#";
-          writer.writef(F_BSP_2, i, "-",
-                        w, " ", seq[i],
-                        seq[w], "/", s2_1, s2_2);
+          writer.writef("%4i", i); writer.write("-"); writer.writef("%4i", w);
+          writer.write(" ", seq[i], seq[w], "/", s2_1, s2_2);
           for p in 1..7 {
-              writer.writef("%10.3f%10.3f", BSP[1, p, l], BSP[2, p, l]);
+              writer.writef("%10.3r%10.3r", BSP[1, p, l], BSP[2, p, l]);
           }
           writer.writeln();
       }
       writer.writeln("-" * 130);
       writer.write(" AVG-STD= ");
       for p in 1..7 {
-          writer.writef("%10.3f%10.3f", ovBsp[1, p, 1], ovBsp[2, p, 1]);
+          writer.writef("%10.3r%10.3r", ovBsp[1, p, 1], ovBsp[2, p, 1]);
       }
       writer.writeln();
       writer.close();
@@ -713,9 +758,7 @@ module CustomIO {
       writer.writeln(
         "\n\nFirst column averages, second column standard deviations"
       );
-      writer.writef(F_STRP_1,
-                    " base-step ", "Shift", "Slide", "Rise", "Tilt",
-                    "Roll", "Twist", "Bending", "Stiffness", "Energy");
+      writer.write("      base-step                Shift               Slide                Rise                Tilt                Roll               Twist             Bending           Stiffness              Energy\n");
       writer.writeln("-" * 130);
       
       var l = 0;
@@ -725,23 +768,23 @@ module CustomIO {
           l += 1;
           var s2_1 = if strandsType == 2 then seq[2*nbp-w+1] else "#";
           var s2_2 = if strandsType == 2 then seq[2*nbp-i+1] else "#";
-          writer.writef(F_STRP_2, i, "-", w, " ",
-                      seq[i], seq[w], "/", s2_1, s2_2);
+          writer.writef("%4i", i); writer.write("-"); writer.writef("%4i", w);
+          writer.write(" ", seq[i], seq[w], "/", s2_1, s2_2);
           for p in 1..11 {
-              writer.writef("%10.3f%10.3f", strucp[1, p, l], strucp[2, p, l]);
+              writer.writef("%10.3r%10.3r", strucp[1, p, l], strucp[2, p, l]);
           }
           for p in 1..3 {
-              writer.writef("%10.3f", avstrp[p, l]);
+              writer.writef("%10.3r", avstrp[p, l]);
           }
           writer.writeln();
       }
       writer.writeln("-" * 130);
       writer.write(" AVG-STD= ");
       for p in 1..11 {
-          writer.writef("%10.3f%10.3f", ovStrucp[1, p, 1], ovStrucp[2, p, 1]);
+          writer.writef("%10.3r%10.3r", ovStrucp[1, p, 1], ovStrucp[2, p, 1]);
       }
       for p in 1..3 {
-          writer.writef("%10.3f%10.3f", ovAvstrp[1, p, 1], ovAvstrp[2, p, 1]);
+          writer.writef("%10.3r%10.3r", ovAvstrp[1, p, 1], ovAvstrp[2, p, 1]);
       }
       writer.writeln();
       writer.close();
@@ -776,9 +819,7 @@ module CustomIO {
       writer.writeln(
         "\n\nFirst column averages, second column standard deviations"
       );
-      writer.writef(F_ELAP_1,
-      " base-step ", "Shift", "Slide", "Rise", "Tilt", "Roll",
-      "Twist", "Bending", "Stiffness", "Energy");
+      writer.write("      base-step                Shift               Slide                Rise                Tilt                Roll               Twist             Bending           Stiffness              Energy\n");
       writer.writeln("-" * 130);
 
       var l = 0;
@@ -788,17 +829,17 @@ module CustomIO {
         l += 1;
         var s2_1 = if strandsType == 2 then seq[2*nbp-w+1] else "#";
         var s2_2 = if strandsType == 2 then seq[2*nbp-i+1] else "#";
-        writer.writef(F_ELAP_2, i, "-", w, " ",
-                    seq[i], seq[w], "/", s2_1, s2_2);
+        writer.writef("%4i", i); writer.write("-"); writer.writef("%4i", w);
+        writer.write(" ", seq[i], seq[w], "/", s2_1, s2_2);
         for p in 1..13 {
-            writer.writef("%20.3f", elasp[p, l]);
+            writer.writef("%20.3r", elasp[p, l]);
         }
         writer.writeln();
       }
       writer.writeln("-" * 130);
       writer.write(" AVG-STD= ");
       for p in 1..13 {
-        writer.writef("%10.3f%10.3f", ovElasp[1, p, 1], ovElasp[2, p, 1]);
+        writer.writef("%10.3r%10.3r", ovElasp[1, p, 1], ovElasp[2, p, 1]);
       }
       writer.writeln();
       writer.close();

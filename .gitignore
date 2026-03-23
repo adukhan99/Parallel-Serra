@@ -4,3 +4,4 @@ doc/
 sources/
 .vscode/
 .cls-commands.json
+test*

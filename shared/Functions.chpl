@@ -652,10 +652,13 @@ module Functions {
     var Tmbt: [1..3, 1..3] real;
     var Ombt: [1..3] real;
 
-    var dotR2R1 = vec3Dot(R2(2), R1(2)); // index 2 is row 3
+    // Fortran uses column 3 (R(:,3)) for delta/bp
+    var R1_3 = mkVec3(R1(0)(2), R1(1)(2), R1(2)(2));
+    var R2_3 = mkVec3(R2(0)(2), R2(1)(2), R2(2)(2));
+    var dotR2R1 = vec3Dot(R2_3, R1_3);
     var delta = acos(clamp(dotR2R1, -1.0, 1.0));
     
-    var bp = vec3Normalize(vec3Cross(R2(2), R1(2)));
+    var bp = vec3Normalize(vec3Cross(R2_3, R1_3));
 
     var T1 = mat3Mul(mat3Rotation(bp, -0.5 * delta), R1);
     var T2 = mat3Mul(mat3Rotation(bp, 0.5 * delta), R2);
@@ -665,9 +668,7 @@ module Functions {
       var row = vec3Scale(vec3Add(T1(i), T2(i)), 0.5);
       tTmbt(i) = row;
     }
-    // Re-normalize columns of Tmbt? The original code did:
-    // for i in 1..3 do Tmbt[1..3, i] = normalizeVector(Tmbt[1..3, i]);
-    // This is normalizing COLUMNS.
+
     var col0 = vec3Normalize(mkVec3(tTmbt(0)(0), tTmbt(1)(0), tTmbt(2)(0)));
     var col1 = vec3Normalize(mkVec3(tTmbt(0)(1), tTmbt(1)(1), tTmbt(2)(1)));
     var col2 = vec3Normalize(mkVec3(tTmbt(0)(2), tTmbt(1)(2), tTmbt(2)(2)));
@@ -682,24 +683,26 @@ module Functions {
     var tOmbt = vec3Scale(vec3Add(O1, O2), 0.5);
     Ombt = [tOmbt(0), tOmbt(1), tOmbt(2)];
 
-    var dotT2T1 = vec3Dot(mkVec3(T2(0)(1), T2(1)(1), T2(2)(1)),
-                          mkVec3(T1(0)(1), T1(1)(1), T1(2)(1)));
+    // Fortran uses column 2 (index 1) for Opening
+    var T1_2 = mkVec3(T1(0)(1), T1(1)(1), T1(2)(1));
+    var T2_2 = mkVec3(T2(0)(1), T2(1)(1), T2(2)(1));
+    var dotT2T1 = vec3Dot(T2_2, T1_2);
     BPP[6] = acos(clamp(dotT2T1, -1.0, 1.0));
     
-    BPP[6] = if vec3Dot(vec3Cross(mkVec3(T2(0)(1), T2(1)(1), T2(2)(1)),
-                                  mkVec3(T1(0)(1), T1(1)(1), T1(2)(1))),
-                                  col2) < 0.0
-             then -BPP[6]
-             else BPP[6];
+    if vec3Dot(vec3Cross(T2_2, T1_2), col2) < 0.0
+             then BPP[6] = -BPP[6];
 
-    var psi = if vec3Dot(vec3Cross(bp, col1), col2) < 0.0
-              then -acos(clamp(vec3Dot(bp, col1), -1.0, 1.0))
-              else  acos(clamp(vec3Dot(bp, col1), -1.0, 1.0));
+    // psi uses bp and col1 (Tmbt(:,2))
+    var dotBpCol1 = vec3Dot(bp, col1);
+    var psi = acos(clamp(dotBpCol1, -1.0, 1.0));
+    if vec3Dot(vec3Cross(bp, col1), col2) < 0.0
+              then psi = -psi;
+
     BPP[5] = delta * cos(psi);
     BPP[4] = delta * sin(psi);
 
     var dO = vec3Sub(O1, O2);
-    // BPP[1..3] = dot(dO, Tmbt)
+    // BPP(1:3)=MATMUL(O1-O2,Tmbt) -> BPP[i] = dot(dO, col_{i-1})
     BPP[1] = vec3Dot(dO, col0);
     BPP[2] = vec3Dot(dO, col1);
     BPP[3] = vec3Dot(dO, col2);
@@ -724,7 +727,7 @@ module Functions {
 
     var BSP: [1..9] real;
 
-    // row 3 is index 2
+    // column 3 is index 2
     var R1_3 = mkVec3(R1(0)(2), R1(1)(2), R1(2)(2));
     var R2_3 = mkVec3(R2(0)(2), R2(1)(2), R2(2)(2));
 
@@ -733,6 +736,8 @@ module Functions {
 
     var rt = vec3Normalize(vec3Cross(R1_3, R2_3));
     
+    // Fortran: T1 = MATMUL(Rrt, R1) with Rrt(rt, 0.5*BSP(7))
+    //          T2 = MATMUL(Rrt, R2) with Rrt(rt, -0.5*BSP(7))
     var T1 = mat3Mul(mat3Rotation(rt, 0.5 * BSP[7]), R1);
     var T2 = mat3Mul(mat3Rotation(rt, -0.5 * BSP[7]), R2);
 
@@ -743,15 +748,15 @@ module Functions {
     var col1 = vec3Normalize(vec3Scale(
       vec3Add(mkVec3(T1(0)(1), T1(1)(1), T1(2)(1)),
               mkVec3(T2(0)(1), T2(1)(1), T2(2)(1))), 0.5));
-    var col2 = vec3Normalize(vec3Scale(
-      vec3Add(mkVec3(T1(0)(2), T1(1)(2), T1(2)(2)),
-              mkVec3(T2(0)(2), T2(1)(2), T2(2)(2))), 0.5));
+    var col2 = vec3Normalize(mkVec3(0.5*(T1(0)(2)+T2(0)(2)), 
+                                    0.5*(T1(1)(2)+T2(1)(2)), 
+                                    0.5*(T1(2)(2)+T2(2)(2))));
+    col2 = vec3Normalize(col2);
 
     var T1_2 = mkVec3(T1(0)(1), T1(1)(1), T1(2)(1));
     var T2_2 = mkVec3(T2(0)(1), T2(1)(1), T2(2)(1));
-    var h = vec3Cross(T1_2, T2_2);
     BSP[6] = acos(clamp(vec3Dot(T1_2, T2_2), -1.0, 1.0));
-    if vec3Dot(h, col2) < 0.0 then BSP[6] = -BSP[6];
+    if vec3Dot(vec3Cross(T1_2, T2_2), col2) < 0.0 then BSP[6] = -BSP[6];
 
     var nbpInt = (totaltwist / 180.0):int;
     if nbpInt % 2 != 0 then BSP[6] += 2.0 * pi;
@@ -767,9 +772,8 @@ module Functions {
     col0 = vec3Scale(col0, sign);
     col1 = vec3Scale(col1, sign);
 
-    h = vec3Cross(rt, col1);
     var phi = acos(clamp(vec3Dot(rt, col1), -1.0, 1.0));
-    if vec3Dot(h, col2) < 0.0 then phi = -phi;
+    if vec3Dot(vec3Cross(rt, col1), col2) < 0.0 then phi = -phi;
 
     BSP[4] = BSP[7] * sin(phi);
     BSP[5] = BSP[7] * cos(phi);

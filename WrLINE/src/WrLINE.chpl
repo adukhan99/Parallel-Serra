@@ -175,14 +175,13 @@ module WrLINE {
    * Read AMBER mdcrd file and return strandA, strandB and midpoints.
    */
   proc readMdcrd(inNbp: int, inNstep: int, inTraj: string) {
-    var inp = inTraj;
     try! {
-      var f = open(inp, ioMode.r);
+      var f = open(inTraj, ioMode.r);
       var reader = f.reader();
 
       // Skip header line
       var headerLine: string;
-      reader.readLine(headerLine);
+      if !(try! reader.readLine(headerLine)) then halt("Empty mdcrd file");
 
       // Total coordinates: nstep * nbp * 2 atoms * 3 components
       var totalCoords = inNstep * inNbp * 2 * 3;
@@ -190,16 +189,16 @@ module WrLINE {
       var idx = 0;
 
       // Read all coordinate values (8 characters wide, fixed format)
-      var line: string;
-      while reader.readLine(line) {
-        var l = line.size;
-        if l > 0 && line[l - 1] == "\n" then l -= 1;
+      for line in reader.lines(stripNewline=true) {
+        var l = line.numBytes;
         var n = l / 8;
         for i in 0..#n {
           if idx < totalCoords {
-            var token = line[i * 8..#8];
-            coords[idx] = token: real;
-            idx += 1;
+            var token = line[i * 8..#8].strip();
+            if token != "" {
+              coords[idx] = token: real;
+              idx += 1;
+            }
           }
         }
       }
@@ -212,13 +211,16 @@ module WrLINE {
       var atomsPerStep = inNbp * 2;
       for t in 1..inNstep {
         for j in 1..inNbp {
-          var aIdx = ((t - 1) * atomsPerStep + (j - 1)) * 3;
+          // strand_a = data_array[0:num_bp]
+          var aAtomIdx = (j - 1);
+          var aIdx = ((t - 1) * atomsPerStep + aAtomIdx) * 3;
           rA[1, t, j] = coords[aIdx];
           rA[2, t, j] = coords[aIdx + 1];
           rA[3, t, j] = coords[aIdx + 2];
 
-          var bAtom = 2 * inNbp - j; 
-          var bIdx = ((t - 1) * atomsPerStep + bAtom) * 3;
+          // strand_b = data_array[(2*num_bp - 1):(num_bp - 1):-1]
+          var bAtomIdx = (2 * inNbp - j);
+          var bIdx = ((t - 1) * atomsPerStep + bAtomIdx) * 3;
           rB[1, t, j] = coords[bIdx];
           rB[2, t, j] = coords[bIdx + 1];
           rB[3, t, j] = coords[bIdx + 2];
@@ -258,20 +260,14 @@ module WrLINE {
     forall j in 1..inNbp {
       for t in 1..inNstep {
         var sx = r[1, t, j], sy = r[2, t, j], sz = r[3, t, j];
-        var k_actual = 0;
-        for k in 1..5 {
-          if isCircular {
-            var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
-            var jp = ((j - 1 + k) % inNbp) + 1;
-            sx += r[1, t, jm] + r[1, t, jp];
-            sy += r[2, t, jm] + r[2, t, jp];
-            sz += r[3, t, jm] + r[3, t, jp];
-            k_actual = k;
-          } else {
-            // Replicate Python reference behavior: negative index wraps
-            // around (Python's negative indexing), but positive out-of-range
-            // raises IndexError and breaks.
+        var k = 0;
+        while k < 5 {
+          k += 1;
+          if !isCircular {
+            // Python: midpoints[:, t, j-k] works (wraps), 
+            //         midpoints[:, t, j+k] can IndexError
             if j + k > inNbp {
+              k -= 1;
               break;
             }
             var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
@@ -279,10 +275,15 @@ module WrLINE {
             sx += r[1, t, jm] + r[1, t, jp];
             sy += r[2, t, jm] + r[2, t, jp];
             sz += r[3, t, jm] + r[3, t, jp];
-            k_actual = k;
+          } else {
+            var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
+            var jp = ((j - 1 + k) % inNbp) + 1;
+            sx += r[1, t, jm] + r[1, t, jp];
+            sy += r[2, t, jm] + r[2, t, jp];
+            sz += r[3, t, jm] + r[3, t, jp];
           }
         }
-        var denom = (2.0 * k_actual + 1.0);
+        var denom = (2.0 * k + 1.0);
         rC[1, t, j] = sx / denom;
         rC[2, t, j] = sy / denom;
         rC[3, t, j] = sz / denom;
@@ -365,14 +366,23 @@ module WrLINE {
         var sx = r[1, t, j], sy = r[2, t, j], sz = r[3, t, j];
         var k = 0;
         var prev = Tw;
+        var triggeredBreak = false;
+
         while Tw < 360.0 {
           k += 1;
           prev = Tw;
-          if !isCircular && (j - k < 1 || j + k > inNbp) {
-            break;
+          
+          if !isCircular {
+            if j + k > inNbp {
+              triggeredBreak = true;
+              break;
+            }
           }
+          if isCircular && k > inNbp then break;
+          
           var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
-          var jp = ((j - 1 + k) % inNbp) + 1;
+          var jp = if !isCircular then j + k else ((j - 1 + k) % inNbp) + 1;
+          
           Tw += tw[t, jm] + tw[t, jp];
           sx += r[1, t, jm] + r[1, t, jp];
           sy += r[2, t, jm] + r[2, t, jp];
@@ -380,17 +390,20 @@ module WrLINE {
         }
 
         var w: real = 0.0;
-        if isCircular || (j - k >= 1 && j + k <= inNbp) {
+        if !isCircular && triggeredBreak {
+           w = 0.0;
+        } else {
           if Tw != prev then
             w = (360.0 - prev) / (Tw - prev);
           else
             w = 0.0;
             
-          var jmW = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
-          var jpW = ((j - 1 + k) % inNbp) + 1;
-          sx -= (1.0 - w) * (r[1, t, jmW] + r[1, t, jpW]);
-          sy -= (1.0 - w) * (r[2, t, jmW] + r[2, t, jpW]);
-          sz -= (1.0 - w) * (r[3, t, jmW] + r[3, t, jpW]);
+          var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
+          var jp = if !isCircular then j + k else ((j - 1 + k) % inNbp) + 1;
+          
+          sx -= (1.0 - w) * (r[1, t, jm] + r[1, t, jp]);
+          sy -= (1.0 - w) * (r[2, t, jm] + r[2, t, jp]);
+          sz -= (1.0 - w) * (r[3, t, jm] + r[3, t, jp]);
         }
 
         var denom = 2.0 * (k: real + w) - 1.0;
@@ -519,12 +532,17 @@ module WrLINE {
     var loopLimit = if isCircular then l else l - 1;
     forall j in 1..loopLimit with (+ reduce Wr) {
       for k in 1..j - 1 {
+        // segments are (j, j+1) and (k, k+1)
         var tj = mkVec(y[j+1,1]-y[j,1], y[j+1,2]-y[j,2], y[j+1,3]-y[j,3]);
         var tk = mkVec(y[k+1,1]-y[k,1], y[k+1,2]-y[k,2], y[k+1,3]-y[k,3]);
+        // Vector joining midpoints of segments? No, Python uses y[j]-y[k]
         var rjk = mkVec(y[j,1]-y[k,1], y[j,2]-y[k,2], y[j,3]-y[k,3]);
-        var dotVal = vecDot(rjk, vecCross(tj, tk));
-        var distSq = vecDot(rjk, rjk);
-        Wr += dotVal / (distSq * sqrt(distSq) * 2.0 * pi);
+        var crossJK = vecCross(tj, tk);
+        var dotVal = vecDot(rjk, crossJK);
+        var dist = vecNorm(rjk);
+        if dist > 1e-9 {
+          Wr += dotVal / (dist**3 * 2.0 * pi);
+        }
       }
     }
     return Wr;
@@ -559,12 +577,19 @@ module WrLINE {
         sub.wait();
       }
       if !isDir(name) then mkdir(name, parents=true);
+      writeln("Reading trajectory...");
       var (rA, rB, r) = readMdcrd(nbp, nstep, traj);
+      writeln("Calculating helical axis...");
       var rC = haxis(nbp, nstep, r);
+      writeln("Calculating twist...");
       var tw = calcTwist(name, nbp, nstep, rA, rB, rC);
+      writeln("Calculating central helical axis...");
       var r1 = caxis(nbp, nstep, r, tw);
+      writeln("Calculating register angles...");
       sinreg(name, nbp, nstep, r, r1);
+      writeln("Generating coordinate files...");
       makeFiles(name, nbp, nstep, r, r1);
+      writeln("Calculating writhe...");
       calcWrithe(name, nbp, nstep);
       writeln("job ", name, " done!!! XD!! :) ");
     }

@@ -20,6 +20,9 @@ module SerraNA {
   // 1 for single-stranded, 2 for double-stranded
   config var strandsType: int = 2;
   config var structType: int = 1;  // 1 for linear, 2 for circular
+  config var flipStrand2: bool = true;
+  config var pairReverse: bool = true;
+  config var forceNoBox: bool = false;
 
   /*
    * Parse a simple key = value config file.
@@ -103,6 +106,7 @@ module SerraNA {
       writeln("Reading topology file");
       var (origNbp, nAtoms, box, origSeq, ringIndices) =
         topologyAmber(cfgTop, cfgStrandsType);
+      if forceNoBox then box = 0;
 
       writeln("Reading trajectory file");
       var isCircular = (cfgStructType == 2);
@@ -178,17 +182,18 @@ module SerraNA {
           l += nAuth;
         }
 
-        if cfgStrandsType == 2 {
+        if cfgStrandsType == 2 && flipStrand2 {
           for i in nbp+1..nb {
             R[1..3, 2, i] = -R[1..3, 2, i];
             R[1..3, 3, i] = -R[1..3, 3, i];
           }
 
           for i in 1..nbp {
+            var j = if pairReverse then nb + 1 - i else nbp + i;
             var BPP_T_O =
               basepairParameters(
-                O[1..3, i], O[1..3, nb+1-i],
-                R[1..3, 1..3, i], R[1..3, 1..3, nb+1-i]);
+                O[1..3, i], O[1..3, j],
+                R[1..3, 1..3, i], R[1..3, 1..3, j]);
             BPP[1..6, i, k] = BPP_T_O(0);
             Rmbt[1..3, 1..3, i] = BPP_T_O(1);
             Ombt[1..3, i] = BPP_T_O(2);

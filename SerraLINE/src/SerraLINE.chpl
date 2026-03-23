@@ -26,29 +26,50 @@ module SerraLINE {
   config var xyzFormat: bool = false;
 
   /*
-   * Parse a simple key = value config file.
-   * Lines beginning with 'c' or '#' are treated as comments.
-   * Returns a map of key -> value strings.
+   * Positional input parser for SerraLINE.in
    */
-  proc parseConfigFile(path: string) {
-    var cfg: map(string, string);
+  proc parseSerraLINEInput(path: string) {
     try! {
       var f = open(path, ioMode.r);
       var reader = f.reader();
       var line: string;
-      while reader.readLine(line) {
-        line = line.strip();
-        if line == "" then continue;
-        if line[0] == "c" || line[0] == "#" then continue;
-        var eqIdx = line.find("="):int;
-        if eqIdx == -1 then continue;
-        var k = line[0..eqIdx-1].strip();
-        var v = line[eqIdx+1..].strip();
-        cfg.add(k, v);
+
+      proc nextValue(): string {
+        for line in reader.lines(stripNewline=true) {
+          var s = line.strip();
+          if s == "" || s.startsWith("c") || s.startsWith("#") then continue;
+          return s;
+        }
+        return "";
       }
+
+      var isCircularVal = nextValue():int != 0;
+      var strandsTypeVal = nextValue():int;
+      var nbpArgVal = nextValue():int;
+      var bpFittingStr = nextValue();
+      var tLengthVal = nextValue():int;
+      var topVal = nextValue();
+      var trajVal = nextValue();
+      
+      var projLine = nextValue();
+      var printProjVal = false;
+      var xyzFormatVal = false;
+      if projLine != "" {
+        if projLine.find(",") != -1 {
+          var tokens = projLine.split(",");
+          printProjVal = tokens[0].strip():int != 0;
+          if tokens.size > 1 {
+            xyzFormatVal = tokens[1].strip() == "xyz";
+          }
+        } else {
+          printProjVal = projLine:int != 0;
+        }
+      }
+      
       f.close();
+      return (isCircularVal, strandsTypeVal, nbpArgVal, bpFittingStr,
+              tLengthVal, topVal, trajVal, printProjVal, xyzFormatVal);
     }
-    return cfg;
   }
 
   proc writeAvParms(nbp: int, nldim: int, frames: int, ref seq: [] string,
@@ -256,28 +277,19 @@ module SerraLINE {
         cfgXyzFormat = xyzFormat;
   
       if configFile != "" {
-        var cfg = parseConfigFile(configFile);
-        // Config values serve as defaults; CLI flags always win.
-        if top == "" then
-          cfgTop = cfg.get("top", cfgTop);
-        if traj == "" then
-          cfgTraj = cfg.get("traj", cfgTraj);
-        if !isCircular && cfg.contains("isCircular") then
-          cfgIsCircular = cfg["isCircular"] == "true";
-        if strandsType == 1 && cfg.contains("strandsType") then
-          cfgStrandsType = cfg["strandsType"]:int;
-        if nbpArg == 0 && cfg.contains("nbpArg") then
-          cfgNbpArg = cfg["nbpArg"]:int;
-        if fitplane && cfg.contains("fitplane") then
-          cfgFitplane = cfg["fitplane"] == "true";
-        if bpFitting == "0" then
-          cfgBpFitting = cfg.get("bpFitting", cfgBpFitting);
-        if tLength == 1 && cfg.contains("tLength") then
-          cfgTLength = cfg["tLength"]:int;
-        if !printProj && cfg.contains("printProj") then
-          cfgPrintProj = cfg["printProj"] == "true";
-        if !xyzFormat && cfg.contains("xyzFormat") then
-          cfgXyzFormat = cfg["xyzFormat"] == "true";
+        var (c_isCircular, c_strandsType, c_nbpArg, c_bpFitting,
+             c_tLength, c_top, c_traj, c_printProj, c_xyzFormat) =
+          parseSerraLINEInput(configFile);
+        cfgIsCircular = c_isCircular;
+        cfgStrandsType = c_strandsType;
+        cfgNbpArg = c_nbpArg;
+        cfgBpFitting = c_bpFitting;
+        cfgTLength = c_tLength;
+        cfgTop = c_top;
+        cfgTraj = c_traj;
+        cfgPrintProj = c_printProj;
+        cfgXyzFormat = c_xyzFormat;
+        cfgFitplane = (cfgBpFitting != "1");
       }
   
       if cfgTraj == "" {
@@ -310,7 +322,7 @@ module SerraLINE {
         coordDom = rawCoords.domain;
         coords = rawCoords;
         seqDom = {1..actualNbp};
-        finalSeq = origSeq[0..actualNbp-1];
+        finalSeq = origSeq[1..actualNbp];
       } else {
         writeln("Reading trajectory file (no topology)");
         if actualNbp <= 0 then
