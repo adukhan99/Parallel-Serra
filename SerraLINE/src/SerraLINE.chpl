@@ -32,41 +32,56 @@ module SerraLINE {
     try! {
       var f = open(path, ioMode.r);
       var reader = f.reader();
-      var line: string;
 
-      proc nextValue(): string {
-        for line in reader.lines(stripNewline=true) {
-          var s = line.strip();
-          if s == "" || s.startsWith("c") || s.startsWith("#") then continue;
-          return s;
-        }
-        return "";
+      // Read all key = value pairs into a map (ignores blank lines and comments).
+      var cfg: map(string, string);
+      for line in reader.lines(stripNewline=true) {
+        var s = line.strip();
+        if s == "" || s.startsWith("#") || s.startsWith("c") then continue;
+        var eqIdx = s.find("=");
+        if eqIdx == -1 then continue; // skip non-key=value lines
+        var key = s[..eqIdx-1].strip();
+        var val = s[eqIdx+1..].strip();
+        // Strip inline comments (anything after '#')
+        var hashIdx = val.find("#");
+        if hashIdx != -1 then val = val[..hashIdx-1].strip();
+        cfg[key] = val;
       }
-
-      var isCircularVal = nextValue():int != 0;
-      var strandsTypeVal = nextValue():int;
-      var nbpArgVal = nextValue():int;
-      var bpFittingStr = nextValue();
-      var tLengthVal = nextValue():int;
-      var topVal = nextValue();
-      var trajVal = nextValue();
-      
-      var projLine = nextValue();
-      var printProjVal = false;
-      var xyzFormatVal = false;
-      if projLine != "" {
-        if projLine.find(",") != -1 {
-          var tokens = projLine.split(",");
-          printProjVal = tokens[0].strip():int != 0;
-          if tokens.size > 1 {
-            xyzFormatVal = tokens[1].strip() == "xyz";
-          }
-        } else {
-          printProjVal = projLine:int != 0;
-        }
-      }
-      
       f.close();
+
+      var isCircularStr = "false";
+      if cfg.contains("isCircular") then isCircularStr = try! cfg["isCircular"];
+      var isCircularVal = isCircularStr == "true" || isCircularStr == "1";
+
+      var strandsTypeStr = "1";
+      if cfg.contains("strandsType") then strandsTypeStr = try! cfg["strandsType"];
+      var strandsTypeVal = strandsTypeStr:int;
+
+      var nbpArgStr = "0";
+      if cfg.contains("nbpArg") then nbpArgStr = try! cfg["nbpArg"];
+      var nbpArgVal = nbpArgStr:int;
+
+      var bpFittingStr = "0";
+      if cfg.contains("bpFitting") then bpFittingStr = try! cfg["bpFitting"];
+
+      var tLengthStr = "1";
+      if cfg.contains("tLength") then tLengthStr = try! cfg["tLength"];
+      var tLengthVal = tLengthStr:int;
+
+      var topVal = "";
+      if cfg.contains("top") then topVal = try! cfg["top"];
+
+      var trajVal = "";
+      if cfg.contains("traj") then trajVal = try! cfg["traj"];
+
+      var printProjStr = "false";
+      if cfg.contains("printProj") then printProjStr = try! cfg["printProj"];
+      var printProjVal = printProjStr == "true" || printProjStr == "1";
+
+      var xyzFmtStr = "false";
+      if cfg.contains("xyzFormat") then xyzFmtStr = try! cfg["xyzFormat"];
+      var xyzFormatVal = xyzFmtStr == "true" || xyzFmtStr == "1";
+
       return (isCircularVal, strandsTypeVal, nbpArgVal, bpFittingStr,
               tLengthVal, topVal, trajVal, printProjVal, xyzFormatVal);
     }

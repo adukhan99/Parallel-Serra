@@ -317,7 +317,8 @@ module CustomIO {
           var nv: int;
           if !r2.read(nv) then break;
           var dummy: string;
-          r2.readLine(dummy);
+          r2.readLine(dummy); // Consume the rest of line 1 (the newline)
+          r2.readLine(dummy); // Consume line 2 (the comment line)
         }
         numFrames += 1;
         if numFrames > D.high(1) {
