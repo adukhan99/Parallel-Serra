@@ -5,3 +5,4 @@ sources/
 .vscode/
 .cls-commands.json
 test*
+.codex

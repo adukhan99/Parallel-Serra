@@ -1,25 +1,17 @@
-.PHONY: all SerraNA SerraLINE Extract Analysis WrLINE clean
+MODULES := SerraNA SerraLINE Extract Analysis WrLINE
 
-all: SerraNA SerraLINE Extract Analysis WrLINE
+.PHONY: all all-debug clean $(MODULES) $(MODULES:%=%-debug)
 
-SerraNA:
-	cd SerraNA && chpl-shim mason build
+all: $(MODULES)
+all-debug: $(MODULES:%=%-debug)
 
-SerraLINE:
-	cd SerraLINE && chpl-shim mason build
+$(MODULES):
+	cd $@ && chpl-shim mason build -- --fast
 
-Extract:
-	cd Extract && chpl-shim mason build
-
-Analysis:
-	cd Analysis && chpl-shim mason build
-
-WrLINE:
-	cd WrLINE && chpl-shim mason build
+$(MODULES:%=%-debug):
+	cd $(@:-debug=) && chpl-shim mason build
 
 clean:
-	cd SerraNA && mason clean
-	cd SerraLINE && mason clean
-	cd Extract && mason clean
-	cd Analysis && mason clean
-	cd WrLINE && mason clean
+	for m in $(MODULES); do \
+		(cd $$m && mason clean); \
+	done
