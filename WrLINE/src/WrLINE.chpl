@@ -177,7 +177,7 @@ module WrLINE {
   proc readMdcrd(inNbp: int, inNstep: int, inTraj: string) {
     try! {
       var f = open(inTraj, ioMode.r);
-      var reader = f.reader();
+      var reader = f.reader(locking=false);
 
       // Skip header line
       var headerLine: string;
@@ -194,8 +194,11 @@ module WrLINE {
         var n = l / 8;
         for i in 0..#n {
           if idx < totalCoords {
-            var token = line[i * 8..#8].strip();
-            if token != "" {
+            var token = line[i * 8..#8];
+            var isBlank = true;
+            for b in token.bytes() do
+              if b != 32 { isBlank = false; break; }
+            if !isBlank {
               coords[idx] = token: real;
               idx += 1;
             }
@@ -205,7 +208,7 @@ module WrLINE {
       f.close();
 
       // Build strand arrays directly from flat coords
-      var rA, rB: [1..3, 1..inNstep, 1..inNbp] real;
+      var rA, rB: [1..inNstep, 1..inNbp, 1..3] real;
 
       // coords layout: for each atom (nstep * nbp*2 atoms), 3 values
       var atomsPerStep = inNbp * 2;
@@ -214,30 +217,30 @@ module WrLINE {
           // strand_a = data_array[0:num_bp]
           var aAtomIdx = (j - 1);
           var aIdx = ((t - 1) * atomsPerStep + aAtomIdx) * 3;
-          rA[1, t, j] = coords[aIdx];
-          rA[2, t, j] = coords[aIdx + 1];
-          rA[3, t, j] = coords[aIdx + 2];
+          rA[t, j, 1] = coords[aIdx];
+          rA[t, j, 2] = coords[aIdx + 1];
+          rA[t, j, 3] = coords[aIdx + 2];
 
           // strand_b = data_array[(2*num_bp - 1):(num_bp - 1):-1]
           var bAtomIdx = (2 * inNbp - j);
           var bIdx = ((t - 1) * atomsPerStep + bAtomIdx) * 3;
-          rB[1, t, j] = coords[bIdx];
-          rB[2, t, j] = coords[bIdx + 1];
-          rB[3, t, j] = coords[bIdx + 2];
+          rB[t, j, 1] = coords[bIdx];
+          rB[t, j, 2] = coords[bIdx + 1];
+          rB[t, j, 3] = coords[bIdx + 2];
         }
       }
 
       // r = midpoints of neighboring bp steps
-      var r: [1..3, 1..inNstep, 1..inNbp] real;
+      var r: [1..inNstep, 1..inNbp, 1..3] real;
       for j in 1..inNbp {
         var jNext = (j % inNbp) + 1;
         for t in 1..inNstep {
           for c in 1..3 {
             if !isCircular && j == inNbp {
-              r[c, t, j] = 0.5 * (rA[c, t, j] + rB[c, t, j]);
+              r[t, j, c] = 0.5 * (rA[t, j, c] + rB[t, j, c]);
             } else {
-              r[c, t, j] = 0.25 * (rA[c, t, j] + rA[c, t, jNext]
-                                   + rB[c, t, j] + rB[c, t, jNext]);
+              r[t, j, c] = 0.25 * (rA[t, j, c] + rA[t, jNext, c]
+                                   + rB[t, j, c] + rB[t, jNext, c]);
             }
           }
         }
@@ -255,11 +258,11 @@ module WrLINE {
    * 1st-order helical axis
    */
   proc haxis(inNbp: int, inNstep: int,
-             ref r: [1..3, 1..inNstep, 1..inNbp] real) {
-    var rC: [1..3, 1..inNstep, 1..inNbp] real;
-    forall j in 1..inNbp {
-      for t in 1..inNstep {
-        var sx = r[1, t, j], sy = r[2, t, j], sz = r[3, t, j];
+             ref r: [1..inNstep, 1..inNbp, 1..3] real) {
+    var rC: [1..inNstep, 1..inNbp, 1..3] real;
+    forall t in 1..inNstep {
+      for j in 1..inNbp {
+        var sx = r[t, j, 1], sy = r[t, j, 2], sz = r[t, j, 3];
         var k = 0;
         while k < 5 {
           k += 1;
@@ -272,21 +275,21 @@ module WrLINE {
             }
             var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
             var jp = j + k;
-            sx += r[1, t, jm] + r[1, t, jp];
-            sy += r[2, t, jm] + r[2, t, jp];
-            sz += r[3, t, jm] + r[3, t, jp];
+            sx += r[t, jm, 1] + r[t, jp, 1];
+            sy += r[t, jm, 2] + r[t, jp, 2];
+            sz += r[t, jm, 3] + r[t, jp, 3];
           } else {
             var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
             var jp = ((j - 1 + k) % inNbp) + 1;
-            sx += r[1, t, jm] + r[1, t, jp];
-            sy += r[2, t, jm] + r[2, t, jp];
-            sz += r[3, t, jm] + r[3, t, jp];
+            sx += r[t, jm, 1] + r[t, jp, 1];
+            sy += r[t, jm, 2] + r[t, jp, 2];
+            sz += r[t, jm, 3] + r[t, jp, 3];
           }
         }
         var denom = (2.0 * k + 1.0);
-        rC[1, t, j] = sx / denom;
-        rC[2, t, j] = sy / denom;
-        rC[3, t, j] = sz / denom;
+        rC[t, j, 1] = sx / denom;
+        rC[t, j, 2] = sy / denom;
+        rC[t, j, 3] = sz / denom;
       }
     }
     return rC;
@@ -296,39 +299,39 @@ module WrLINE {
    * Calculate twist
    */
   proc calcTwist(inName: string, inNbp: int, inNstep: int,
-                 ref rA: [1..3, 1..inNstep, 1..inNbp] real,
-                 ref rB: [1..3, 1..inNstep, 1..inNbp] real,
-                 ref rC: [1..3, 1..inNstep, 1..inNbp] real) {
+                 ref rA: [1..inNstep, 1..inNbp, 1..3] real,
+                 ref rB: [1..inNstep, 1..inNbp, 1..3] real,
+                 ref rC: [1..inNstep, 1..inNbp, 1..3] real) {
     var tw: [1..inNstep, 1..inNbp] real;
-    forall j in 1..inNbp {
-      for t in 1..inNstep {
+    forall t in 1..inNstep {
+      for j in 1..inNbp {
         var Z: vec3;
         if isCircular {
           var jNext = (j % inNbp) + 1;
           var jPrev = ((j - 2 + inNbp) % inNbp) + 1;
-          Z = mkVec(rC[1, t, jNext] - rC[1, t, jPrev],
-                    rC[2, t, jNext] - rC[2, t, jPrev],
-                    rC[3, t, jNext] - rC[3, t, jPrev]);
-          tw[t, j] = twistAngle(mkVec(rA[1, t, j], rA[2, t, j], rA[3, t, j]),
-                       mkVec(rB[1, t, j], rB[2, t, j], rB[3, t, j]),
-                       mkVec(rA[1, t, jNext], rA[2, t, jNext], rA[3, t, jNext]),
-                       mkVec(rB[1, t, jNext], rB[2, t, jNext], rB[3, t, jNext]),
+          Z = mkVec(rC[t, jNext, 1] - rC[t, jPrev, 1],
+                    rC[t, jNext, 2] - rC[t, jPrev, 2],
+                    rC[t, jNext, 3] - rC[t, jPrev, 3]);
+          tw[t, j] = twistAngle(mkVec(rA[t, j, 1], rA[t, j, 2], rA[t, j, 3]),
+                       mkVec(rB[t, j, 1], rB[t, j, 2], rB[t, j, 3]),
+                       mkVec(rA[t, jNext, 1], rA[t, jNext, 2], rA[t, jNext, 3]),
+                       mkVec(rB[t, jNext, 1], rB[t, jNext, 2], rB[t, jNext, 3]),
                        Z);
         } else {
           if j < inNbp {
             if j > 1 {
-              Z = mkVec(rC[1, t, j+1] - rC[1, t, j-1],
-                        rC[2, t, j+1] - rC[2, t, j-1],
-                        rC[3, t, j+1] - rC[3, t, j-1]);
+              Z = mkVec(rC[t, j+1, 1] - rC[t, j-1, 1],
+                        rC[t, j+1, 2] - rC[t, j-1, 2],
+                        rC[t, j+1, 3] - rC[t, j-1, 3]);
             } else {
-              Z = mkVec(2.0 * (rC[1, t, j+1] - rC[1, t, j]),
-                        2.0 * (rC[2, t, j+1] - rC[2, t, j]),
-                        2.0 * (rC[3, t, j+1] - rC[3, t, j]));
+              Z = mkVec(2.0 * (rC[t, j+1, 1] - rC[t, j, 1]),
+                        2.0 * (rC[t, j+1, 2] - rC[t, j, 2]),
+                        2.0 * (rC[t, j+1, 3] - rC[t, j, 3]));
             }
-            tw[t, j] = twistAngle(mkVec(rA[1, t, j], rA[2, t, j], rA[3, t, j]),
-                         mkVec(rB[1, t, j], rB[2, t, j], rB[3, t, j]),
-                         mkVec(rA[1, t, j+1], rA[2, t, j+1], rA[3, t, j+1]),
-                         mkVec(rB[1, t, j+1], rB[2, t, j+1], rB[3, t, j+1]),
+            tw[t, j] = twistAngle(mkVec(rA[t, j, 1], rA[t, j, 2], rA[t, j, 3]),
+                         mkVec(rB[t, j, 1], rB[t, j, 2], rB[t, j, 3]),
+                         mkVec(rA[t, j+1, 1], rA[t, j+1, 2], rA[t, j+1, 3]),
+                         mkVec(rB[t, j+1, 1], rB[t, j+1, 2], rB[t, j+1, 3]),
                          Z);
           } else {
             tw[t, j] = 0.0;
@@ -337,16 +340,12 @@ module WrLINE {
       }
     }
 
-    // Write tw.ser (serial I/O)
+    // Write tw.ser (array block I/O)
     try! {
       var f = open(inName + "/tw.ser", ioMode.cw);
-      var writer = f.writer();
-      for t in 1..inNstep {
-        for j in 1..inNbp {
-          writer.write(tw[t, j], " ");
-        }
-        writer.writeln();
-      }
+      var writer = f.writer(locking=false);
+      for t in 1..inNstep do
+        writer.writeln(tw[t, ..]);
       writer.close();
     }
 
@@ -357,13 +356,13 @@ module WrLINE {
    * Calculate central helical axis (CAXIS).
    */
   proc caxis(inNbp: int, inNstep: int,
-             ref r: [1..3, 1..inNstep, 1..inNbp] real,
+             ref r: [1..inNstep, 1..inNbp, 1..3] real,
              ref tw: [1..inNstep, 1..inNbp] real) {
-    var r1: [1..3, 1..inNstep, 1..inNbp] real;
-    forall j in 1..inNbp {
-      for t in 1..inNstep {
+    var r1: [1..inNstep, 1..inNbp, 1..3] real;
+    forall t in 1..inNstep {
+      for j in 1..inNbp {
         var Tw = tw[t, j];
-        var sx = r[1, t, j], sy = r[2, t, j], sz = r[3, t, j];
+        var sx = r[t, j, 1], sy = r[t, j, 2], sz = r[t, j, 3];
         var k = 0;
         var prev = Tw;
         var triggeredBreak = false;
@@ -384,9 +383,9 @@ module WrLINE {
           var jp = if !isCircular then j + k else ((j - 1 + k) % inNbp) + 1;
           
           Tw += tw[t, jm] + tw[t, jp];
-          sx += r[1, t, jm] + r[1, t, jp];
-          sy += r[2, t, jm] + r[2, t, jp];
-          sz += r[3, t, jm] + r[3, t, jp];
+          sx += r[t, jm, 1] + r[t, jp, 1];
+          sy += r[t, jm, 2] + r[t, jp, 2];
+          sz += r[t, jm, 3] + r[t, jp, 3];
         }
 
         var w: real = 0.0;
@@ -401,16 +400,16 @@ module WrLINE {
           var jm = ((j - 1 - k) % inNbp + inNbp) % inNbp + 1;
           var jp = if !isCircular then j + k else ((j - 1 + k) % inNbp) + 1;
           
-          sx -= (1.0 - w) * (r[1, t, jm] + r[1, t, jp]);
-          sy -= (1.0 - w) * (r[2, t, jm] + r[2, t, jp]);
-          sz -= (1.0 - w) * (r[3, t, jm] + r[3, t, jp]);
+          sx -= (1.0 - w) * (r[t, jm, 1] + r[t, jp, 1]);
+          sy -= (1.0 - w) * (r[t, jm, 2] + r[t, jp, 2]);
+          sz -= (1.0 - w) * (r[t, jm, 3] + r[t, jp, 3]);
         }
 
         var denom = 2.0 * (k: real + w) - 1.0;
         if denom == 0 then denom = 1.0;
-        r1[1, t, j] = sx / denom;
-        r1[2, t, j] = sy / denom;
-        r1[3, t, j] = sz / denom;
+        r1[t, j, 1] = sx / denom;
+        r1[t, j, 2] = sy / denom;
+        r1[t, j, 3] = sz / denom;
       }
     }
     return r1;
@@ -420,25 +419,25 @@ module WrLINE {
    * Calculate sine of the register angles.
    */
   proc sinreg(inName: string, inNbp: int, inNstep: int,
-              ref r: [1..3, 1..inNstep, 1..inNbp] real,
-              ref r1: [1..3, 1..inNstep, 1..inNbp] real) {
+              ref r: [1..inNstep, 1..inNbp, 1..3] real,
+              ref r1: [1..inNstep, 1..inNbp, 1..3] real) {
     var sinRegArr: [1..inNstep, 0..inNbp] real;
-    forall j in 1..inNbp {
-      for t in 1..inNstep {
+    forall t in 1..inNstep {
+      for j in 1..inNbp {
         var jPrev = ((j - 2 + inNbp) % inNbp) + 1;
         var jNext = (j % inNbp) + 1;
 
-        var v0 = mkVec(r1[1, t, j] - r1[1, t, jPrev],
-                       r1[2, t, j] - r1[2, t, jPrev],
-                       r1[3, t, j] - r1[3, t, jPrev]);
-        var v1 = mkVec(r1[1, t, jNext] - r1[1, t, j],
-                       r1[2, t, jNext] - r1[2, t, j],
-                       r1[3, t, jNext] - r1[3, t, j]);
+        var v0 = mkVec(r1[t, j, 1] - r1[t, jPrev, 1],
+                       r1[t, j, 2] - r1[t, jPrev, 2],
+                       r1[t, j, 3] - r1[t, jPrev, 3]);
+        var v1 = mkVec(r1[t, jNext, 1] - r1[t, j, 1],
+                       r1[t, jNext, 2] - r1[t, j, 2],
+                       r1[t, jNext, 3] - r1[t, j, 3]);
 
         var planeVec = vecCross(v1, v0);
-        var minorGroove = mkVec(r[1, t, jPrev] - r1[1, t, jPrev],
-                                r[2, t, jPrev] - r1[2, t, jPrev],
-                                r[3, t, jPrev] - r1[3, t, jPrev]);
+        var minorGroove = mkVec(r[t, jPrev, 1] - r1[t, jPrev, 1],
+                                r[t, jPrev, 2] - r1[t, jPrev, 2],
+                                r[t, jPrev, 3] - r1[t, jPrev, 3]);
 
         var normM = vecNorm(minorGroove);
         var normP = vecNorm(planeVec);
@@ -459,13 +458,9 @@ module WrLINE {
 
     try! {
       var f = open(inName + "/sinreg.ser", ioMode.cw);
-      var writer = f.writer();
-      for t in 1..inNstep {
-        for j in 0..inNbp {
-          writer.write(sinRegArr[t, j], " ");
-        }
-        writer.writeln();
-      }
+      var writer = f.writer(locking=false);
+      for t in 1..inNstep do
+        writer.writeln(sinRegArr[t, ..]);
       writer.close();
     }
   }
@@ -474,47 +469,44 @@ module WrLINE {
    * Output files
    */
   proc makeFiles(inName: string, inNbp: int, inNstep: int,
-                 ref r: [1..3, 1..inNstep, 1..inNbp] real,
-                 ref r1: [1..3, 1..inNstep, 1..inNbp] real) {
-    coforall task in 1..4 {
-      try! {
-        select task {
-          when 1 {
-            var f = open(inName + "/C.xyz", ioMode.cw);
-            var w = f.writer();
-            for i in 1..inNstep {
-              w.writeln(inNbp);
-              w.writeln();
-              for j in 1..inNbp do
-                w.writef("H %8.3dr %8.3dr %8.3dr \n",
-                        r[1,i,j], r[2,i,j], r[3,i,j]);
-            }
-          }
-          when 2 {
-            var f = open(inName + "/C1.xyz", ioMode.cw);
-            var w = f.writer();
-            for i in 1..inNstep {
-              w.writeln(inNbp);
-              w.writeln();
-              for j in 1..inNbp do
-                w.writef("H %8.3dr %8.3dr %8.3dr \n",
-                        r1[1,i,j], r1[2,i,j], r1[3,i,j]);
-            }
-          }
-          when 3 {
-            var f = open(inName + "/C.3col", ioMode.cw);
-            var w = f.writer();
-            for i in 1..inNstep do for j in 1..inNbp do
-              w.writef("%8.3dr %8.3dr %8.3dr \n",
-                      r[1,i,j], r[2,i,j], r[3,i,j]);
-          }
-          when 4 {
-            var f = open(inName + "/C1.3col", ioMode.cw);
-            var w = f.writer();
-            for i in 1..inNstep do for j in 1..inNbp do
-              w.writef("%8.3dr %8.3dr %8.3dr \n",
-                     r1[1,i,j], r1[2,i,j], r1[3,i,j]);
-          }        }
+                 ref r: [1..inNstep, 1..inNbp, 1..3] real,
+                 ref r1: [1..inNstep, 1..inNbp, 1..3] real) {
+    try! {
+      {
+        var f = open(inName + "/C.xyz", ioMode.cw);
+        var w = f.writer(locking=false);
+        for i in 1..inNstep {
+          w.writeln(inNbp);
+          w.writeln();
+          for j in 1..inNbp do
+            w.writef("H %8.3dr %8.3dr %8.3dr \n",
+                    r[i, j, 1], r[i, j, 2], r[i, j, 3]);
+        }
+      }
+      {
+        var f = open(inName + "/C1.xyz", ioMode.cw);
+        var w = f.writer(locking=false);
+        for i in 1..inNstep {
+          w.writeln(inNbp);
+          w.writeln();
+          for j in 1..inNbp do
+            w.writef("H %8.3dr %8.3dr %8.3dr \n",
+                    r1[i, j, 1], r1[i, j, 2], r1[i, j, 3]);
+        }
+      }
+      {
+        var f = open(inName + "/C.3col", ioMode.cw);
+        var w = f.writer(locking=false);
+        for i in 1..inNstep do for j in 1..inNbp do
+          w.writef("%8.3dr %8.3dr %8.3dr \n",
+                  r[i, j, 1], r[i, j, 2], r[i, j, 3]);
+      }
+      {
+        var f = open(inName + "/C1.3col", ioMode.cw);
+        var w = f.writer(locking=false);
+        for i in 1..inNstep do for j in 1..inNbp do
+          w.writef("%8.3dr %8.3dr %8.3dr \n",
+                 r1[i, j, 1], r1[i, j, 2], r1[i, j, 3]);
       }
     }
   }
@@ -523,33 +515,28 @@ module WrLINE {
    * Writhe
    */
   proc wr(ref X: [] real, t: int, l: int): real {
-    var ySize = if isCircular then l + 1 else l;
-    var y: [1..ySize, 1..3] real;
-    for j in 1..l do for c in 1..3 do y[j, c] = X[t, j, c];
-    if isCircular then for c in 1..3 do y[l+1, c] = X[t, 1, c];
-
     var Wr: real = 0.0;
     var loopLimit = if isCircular then l else l - 1;
-    forall j in 1..loopLimit with (+ reduce Wr) {
+    // Removed nested forall loop and local array 'y' allocations
+    for j in 1..loopLimit {
+      var next_j = if isCircular && j == l then 1 else j + 1;
+      var tj = mkVec(X[t, next_j, 1] - X[t, j, 1], X[t, next_j, 2] - X[t, j, 2], X[t, next_j, 3] - X[t, j, 3]);
       for k in 1..j - 1 {
-        // segments are (j, j+1) and (k, k+1)
-        var tj = mkVec(y[j+1,1]-y[j,1], y[j+1,2]-y[j,2], y[j+1,3]-y[j,3]);
-        var tk = mkVec(y[k+1,1]-y[k,1], y[k+1,2]-y[k,2], y[k+1,3]-y[k,3]);
-        // Vector joining midpoints of segments? No, Python uses y[j]-y[k]
-        var rjk = mkVec(y[j,1]-y[k,1], y[j,2]-y[k,2], y[j,3]-y[k,3]);
+        var next_k = k + 1;
+        var tk = mkVec(X[t, next_k, 1] - X[t, k, 1], X[t, next_k, 2] - X[t, k, 2], X[t, next_k, 3] - X[t, k, 3]);
+        var rjk = mkVec(X[t, j, 1] - X[t, k, 1], X[t, j, 2] - X[t, k, 2], X[t, j, 3] - X[t, k, 3]);
         var crossJK = vecCross(tj, tk);
         var dotVal = vecDot(rjk, crossJK);
         var dist = vecNorm(rjk);
         if dist > 1e-9 {
-          Wr += dotVal / (dist**3 * 2.0 * pi);
+          Wr += dotVal / (dist * dist * dist * 2.0 * pi);
         }
       }
     }
     return Wr;
   }
 
-  proc calcWrithe(inName: string, inNbp: int, inNstep: int) {
-    var X = readThreeCol(inName + "/C1.3col", inNbp, inNstep);
+  proc calcWrithe(inName: string, inNbp: int, inNstep: int, ref X: [1..inNstep, 1..inNbp, 1..3] real) {
     var writheArr: [1..inNstep, 1..2] real;
     forall t in 1..inNstep {
       writheArr[t, 1] = t: real;
@@ -557,7 +544,7 @@ module WrLINE {
     }
     try! {
       var f = open(inName + "/writhe.ser", ioMode.cw);
-      var writer = f.writer();
+      var writer = f.writer(locking=false);
       for t in 1..inNstep do
         writer.writeln(writheArr[t, 1]: int, " ", writheArr[t, 2]);
     }
@@ -590,7 +577,7 @@ module WrLINE {
       writeln("Generating coordinate files...");
       makeFiles(name, nbp, nstep, r, r1);
       writeln("Calculating writhe...");
-      calcWrithe(name, nbp, nstep);
+      calcWrithe(name, nbp, nstep, r1);
       writeln("job ", name, " done!!! XD!! :) ");
     }
   }
