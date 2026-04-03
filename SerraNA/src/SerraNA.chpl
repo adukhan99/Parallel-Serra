@@ -111,7 +111,7 @@ module SerraNA {
       writeln("Reading trajectory file");
       var isCircular = (cfgStructType == 2);
 
-      var coordDom = {1..3, 1..0, 1..0};
+      var coordDom = {1..0, 1..0, 1..3};
       var coords: [coordDom] real;
       var frames, nbp: int;
       var seqDom = {1..0};
@@ -135,13 +135,13 @@ module SerraNA {
       var n_bsp =
         if cfgStructType == 2 then nbp * (nbp - 1) else nbp * (nbp - 1) / 2;
 
-      var BSPDomain = {1..9, 1..n_bsp, 1..frames};
+      var BSPDomain = {1..frames, 1..n_bsp, 1..9};
       var BSP: [BSPDomain] real;
-      var BPPDomain = {1..6, 1..nbp, 1..frames};
+      var BPPDomain = {1..frames, 1..nbp, 1..6};
       var BPP: [BPPDomain] real;
-      var EE_CL_Domain = {1..n_bsp, 1..frames};
+      var EE_CL_Domain = {1..frames, 1..n_bsp};
       var E_E_dist, C_length: [EE_CL_Domain] real;
-      var addedBspDomain = {1..3, 1..n_bsp, 1..frames};
+      var addedBspDomain = {1..frames, 1..n_bsp, 1..3};
       var added_bsp: [addedBspDomain] real;
 
       var V, V__1: [1..4, 1..4, 1..n_bsp] real;
@@ -169,7 +169,7 @@ module SerraNA {
           if seq[i] == "G" || seq[i] == "A" then nAuth = n_R;
           else nAuth = n_Y;
 
-          var Ex: [1..3, 1..nAuth] real = coords[1..3, l..l+nAuth-1, k];
+          var Ex: [1..3, 1..nAuth] real = coords[k, l..l+nAuth-1, 1..3];
           var R_O = getRotationROriginO(Ex,
             if nAuth == n_R then (
               if seq[i] == "G" then G_b else A_b) 
@@ -194,7 +194,7 @@ module SerraNA {
               basepairParameters(
                 O[1..3, i], O[1..3, j],
                 R[1..3, 1..3, i], R[1..3, 1..3, j]);
-            BPP[1..6, i, k] = BPP_T_O(0);
+            BPP[k, i, 1..6] = BPP_T_O(0);
             Rmbt[1..3, 1..3, i] = BPP_T_O(1);
             Ombt[1..3, i] = BPP_T_O(2);
           }
@@ -210,26 +210,26 @@ module SerraNA {
               basestepParameters(
                 Ombt[1..3, i], Ombt[1..3, i+1],
                 Rmbt[1..3, 1..3, i], Rmbt[1..3, 1..3, i+1], t_twist);
-            BSP[1..9, bspIdx, k] = res;
-            E_E_dist[bspIdx, k] = absv(Ombt[1..3, i+1] - Ombt[1..3, i]);
-            C_length[bspIdx, k] = E_E_dist[bspIdx, k];
-            added_bsp[1..3, bspIdx, k] = BSP[1..3, i, k];
+            BSP[k, bspIdx, 1..9] = res;
+            E_E_dist[k, bspIdx] = absv(Ombt[1..3, i+1] - Ombt[1..3, i]);
+            C_length[k, bspIdx] = E_E_dist[k, bspIdx];
+            added_bsp[k, bspIdx, 1..3] = BSP[k, i, 1..3];
           }
           for j in 2..nbp-1 {
             for i in 1..nbp-j {
               bspIdx += 1;
-              t_twist = BSP[6, bspIdx-nbp+j-1, k];
+              t_twist = BSP[k, bspIdx-nbp+j-1, 6];
               var res =
                 basestepParameters(
                   Ombt[1..3, i], Ombt[1..3, i+j],
                   Rmbt[1..3, 1..3, i], Rmbt[1..3, 1..3, i+j], t_twist);
-              BSP[1..9, bspIdx, k] = res;
-              E_E_dist[bspIdx, k] = absv(Ombt[1..3, i+j] - Ombt[1..3, i]);
+              BSP[k, bspIdx, 1..9] = res;
+              E_E_dist[k, bspIdx] = absv(Ombt[1..3, i+j] - Ombt[1..3, i]);
               // index check? i+j-1 was the 1bp length step
-              C_length[bspIdx, k] =
-                C_length[bspIdx-nbp+j-1, k] + C_length[i+j-1, k];
-              added_bsp[1..3, bspIdx, k] =
-                added_bsp[1..3, bspIdx-nbp+j-1, k] + BSP[1..3, i+j-1, k];
+              C_length[k, bspIdx] =
+                C_length[k, bspIdx-nbp+j-1] + C_length[k, i+j-1];
+              added_bsp[k, bspIdx, 1..3] =
+                added_bsp[k, bspIdx-nbp+j-1, 1..3] + BSP[k, i+j-1, 1..3];
             }
           }
         } else if i_case == 2 {
@@ -239,25 +239,25 @@ module SerraNA {
               basestepParameters(
                 O[1..3, i], O[1..3, i+1],
                 R[1..3, 1..3, i], R[1..3, 1..3, i+1], t_twist);
-            BSP[1..9, bspIdx, k] = res;
-            E_E_dist[bspIdx, k] = absv(O[1..3, i+1] - O[1..3, i]);
-            C_length[bspIdx, k] = E_E_dist[bspIdx, k];
-            added_bsp[1..3, bspIdx, k] = BSP[1..3, i, k];
+            BSP[k, bspIdx, 1..9] = res;
+            E_E_dist[k, bspIdx] = absv(O[1..3, i+1] - O[1..3, i]);
+            C_length[k, bspIdx] = E_E_dist[k, bspIdx];
+            added_bsp[k, bspIdx, 1..3] = BSP[k, i, 1..3];
           }
           for j in 2..nbp-1 {
             for i in 1..nbp-j {
               bspIdx += 1;
-              t_twist = BSP[6, bspIdx-nbp+j-1, k];
+              t_twist = BSP[k, bspIdx-nbp+j-1, 6];
               var res =
                 basestepParameters(
                   O[1..3, i], O[1..3, i+j],
                   R[1..3, 1..3, i], R[1..3, 1..3, i+j], t_twist);
-              BSP[1..9, bspIdx, k] = res;
-              E_E_dist[bspIdx, k] = absv(O[1..3, i+j] - O[1..3, i]);
-              C_length[bspIdx, k] =
-                C_length[bspIdx-nbp+j-1, k] + C_length[i+j-1, k];
-              added_bsp[1..3, bspIdx, k] =
-                added_bsp[1..3, bspIdx-nbp+j-1, k] + BSP[1..3, i+j-1, k];
+              BSP[k, bspIdx, 1..9] = res;
+              E_E_dist[k, bspIdx] = absv(O[1..3, i+j] - O[1..3, i]);
+              C_length[k, bspIdx] =
+                C_length[k, bspIdx-nbp+j-1] + C_length[k, i+j-1];
+              added_bsp[k, bspIdx, 1..3] =
+                added_bsp[k, bspIdx-nbp+j-1, 1..3] + BSP[k, i+j-1, 1..3];
             }
           }
         }
@@ -269,10 +269,10 @@ module SerraNA {
               basestepParameters(
                 Ombt[1..3, i], Ombt[1..3, w],
                 Rmbt[1..3, 1..3, i], Rmbt[1..3, 1..3, w], t_twist);
-            BSP[1..9, bspIdx, k] = res;
-            E_E_dist[bspIdx, k] = absv(Ombt[1..3, w] - Ombt[1..3, i]);
-            C_length[bspIdx, k] = E_E_dist[bspIdx, k];
-            added_bsp[1..3, bspIdx, k] = BSP[1..3, i, k];
+            BSP[k, bspIdx, 1..9] = res;
+            E_E_dist[k, bspIdx] = absv(Ombt[1..3, w] - Ombt[1..3, i]);
+            C_length[k, bspIdx] = E_E_dist[k, bspIdx];
+            added_bsp[k, bspIdx, 1..3] = BSP[k, i, 1..3];
           }
           for i in nbp..nbp {
             var w = i+1-nbp;
@@ -281,54 +281,54 @@ module SerraNA {
               basestepParameters(
                 Ombt[1..3, i], Ombt[1..3, w],
                 Rmbt[1..3, 1..3, i], Rmbt[1..3, 1..3, w], t_twist);
-            BSP[1..9, bspIdx, k] = res;
-            E_E_dist[bspIdx, k] = absv(Ombt[1..3, w] - Ombt[1..3, i]);
-            C_length[bspIdx, k] = E_E_dist[bspIdx, k];
-            added_bsp[1..3, bspIdx, k] = BSP[1..3, i, k];
+            BSP[k, bspIdx, 1..9] = res;
+            E_E_dist[k, bspIdx] = absv(Ombt[1..3, w] - Ombt[1..3, i]);
+            C_length[k, bspIdx] = E_E_dist[k, bspIdx];
+            added_bsp[k, bspIdx, 1..3] = BSP[k, i, 1..3];
           }
           for j in 2..nbp-1 {
             for i in 1..nbp-j {
               var w = i+j;
               bspIdx += 1;
-              t_twist = BSP[6, bspIdx-nbp, k];
+              t_twist = BSP[k, bspIdx-nbp, 6];
               var res =
                 basestepParameters(
                   Ombt[1..3, i], Ombt[1..3, w],
                   Rmbt[1..3, 1..3, i], Rmbt[1..3, 1..3, w], t_twist);
-              BSP[1..9, bspIdx, k] = res;
-              E_E_dist[bspIdx, k] = absv(Ombt[1..3, w] - Ombt[1..3, i]);
-              C_length[bspIdx, k] =
-                C_length[bspIdx-nbp, k] + C_length[w-1, k];
-              added_bsp[1..3, bspIdx, k] =
-                added_bsp[1..3, bspIdx-nbp, k] + BSP[1..3, w-1, k];
+              BSP[k, bspIdx, 1..9] = res;
+              E_E_dist[k, bspIdx] = absv(Ombt[1..3, w] - Ombt[1..3, i]);
+              C_length[k, bspIdx] =
+                C_length[k, bspIdx-nbp] + C_length[k, w-1];
+              added_bsp[k, bspIdx, 1..3] =
+                added_bsp[k, bspIdx-nbp, 1..3] + BSP[k, w-1, 1..3];
             }
             var i2 = nbp-j+1;
             var w2 = 1;
             bspIdx += 1;
-            t_twist = BSP[6, bspIdx-nbp, k];
+            t_twist = BSP[k, bspIdx-nbp, 6];
             var res2 =
               basestepParameters(
                 Ombt[1..3, i2], Ombt[1..3, w2],
                 Rmbt[1..3, 1..3, i2], Rmbt[1..3, 1..3, w2], t_twist);
-            BSP[1..9, bspIdx, k] = res2;
-            E_E_dist[bspIdx, k] = absv(Ombt[1..3, w2] - Ombt[1..3, i2]);
-            C_length[bspIdx, k] = C_length[bspIdx-nbp, k] + C_length[nbp, k];
-            added_bsp[1..3, bspIdx, k] =
-              added_bsp[1..3, bspIdx-nbp, k] + BSP[1..3, nbp, k];
+            BSP[k, bspIdx, 1..9] = res2;
+            E_E_dist[k, bspIdx] = absv(Ombt[1..3, w2] - Ombt[1..3, i2]);
+            C_length[k, bspIdx] = C_length[k, bspIdx-nbp] + C_length[k, nbp];
+            added_bsp[k, bspIdx, 1..3] =
+              added_bsp[k, bspIdx-nbp, 1..3] + BSP[k, nbp, 1..3];
             for i3 in nbp-j+2..nbp {
               var w3 = i3+j-nbp;
               bspIdx += 1;
-              t_twist = BSP[6, bspIdx-nbp, k];
+              t_twist = BSP[k, bspIdx-nbp, 6];
               var res3 =
                 basestepParameters(
                   Ombt[1..3, i3], Ombt[1..3, w3],
                   Rmbt[1..3, 1..3, i3], Rmbt[1..3, 1..3, w3], t_twist);
-              BSP[1..9, bspIdx, k] = res3;
-              E_E_dist[bspIdx, k] = absv(Ombt[1..3, w3] - Ombt[1..3, i3]);
-              C_length[bspIdx, k] =
-                C_length[bspIdx-nbp, k] + C_length[w3-1, k];
-              added_bsp[1..3, bspIdx, k] =
-                added_bsp[1..3, bspIdx-nbp, k] + BSP[1..3, w3-1, k];
+              BSP[k, bspIdx, 1..9] = res3;
+              E_E_dist[k, bspIdx] = absv(Ombt[1..3, w3] - Ombt[1..3, i3]);
+              C_length[k, bspIdx] =
+                C_length[k, bspIdx-nbp] + C_length[k, w3-1];
+              added_bsp[k, bspIdx, 1..3] =
+                added_bsp[k, bspIdx-nbp, 1..3] + BSP[k, w3-1, 1..3];
             }
           }
         } else if i_case == 4 {
@@ -339,10 +339,10 @@ module SerraNA {
               basestepParameters(
                 O[1..3, i], O[1..3, w],
                 R[1..3, 1..3, i], R[1..3, 1..3, w], t_twist);
-            BSP[1..9, bspIdx, k] = res;
-            E_E_dist[bspIdx, k] = absv(O[1..3, w] - O[1..3, i]);
-            C_length[bspIdx, k] = E_E_dist[bspIdx, k];
-            added_bsp[1..3, bspIdx, k] = BSP[1..3, i, k];
+            BSP[k, bspIdx, 1..9] = res;
+            E_E_dist[k, bspIdx] = absv(O[1..3, w] - O[1..3, i]);
+            C_length[k, bspIdx] = E_E_dist[k, bspIdx];
+            added_bsp[k, bspIdx, 1..3] = BSP[k, i, 1..3];
           }
           for i in nbp..nbp {
             var w = i+1-nbp;
@@ -351,61 +351,61 @@ module SerraNA {
               basestepParameters(
                 O[1..3, i], O[1..3, w],
                 R[1..3, 1..3, i], R[1..3, 1..3, w], t_twist);
-            BSP[1..9, bspIdx, k] = res;
-            E_E_dist[bspIdx, k] = absv(O[1..3, w] - O[1..3, i]);
-            C_length[bspIdx, k] = E_E_dist[bspIdx, k];
-            added_bsp[1..3, bspIdx, k] = BSP[1..3, i, k];
+            BSP[k, bspIdx, 1..9] = res;
+            E_E_dist[k, bspIdx] = absv(O[1..3, w] - O[1..3, i]);
+            C_length[k, bspIdx] = E_E_dist[k, bspIdx];
+            added_bsp[k, bspIdx, 1..3] = BSP[k, i, 1..3];
           }
           for j in 2..nbp-1 {
             for i in 1..nbp-j {
               var w = i+j;
               bspIdx += 1;
-              t_twist = BSP[6, bspIdx-nbp, k];
+              t_twist = BSP[k, bspIdx-nbp, 6];
               var res =
                 basestepParameters(
                   O[1..3, i], O[1..3, w],
                   R[1..3, 1..3, i], R[1..3, 1..3, w], t_twist);
-              BSP[1..9, bspIdx, k] = res;
-              E_E_dist[bspIdx, k] = absv(O[1..3, w] - O[1..3, i]);
-              C_length[bspIdx, k] =
-                C_length[bspIdx-nbp, k] + C_length[w-1, k];
-              added_bsp[1..3, bspIdx, k] =
-                added_bsp[1..3, bspIdx-nbp, k] + BSP[1..3, w-1, k];
+              BSP[k, bspIdx, 1..9] = res;
+              E_E_dist[k, bspIdx] = absv(O[1..3, w] - O[1..3, i]);
+              C_length[k, bspIdx] =
+                C_length[k, bspIdx-nbp] + C_length[k, w-1];
+              added_bsp[k, bspIdx, 1..3] =
+                added_bsp[k, bspIdx-nbp, 1..3] + BSP[k, w-1, 1..3];
             }
             var i2 = nbp-j+1;
             var w2 = 1;
             bspIdx += 1;
-            t_twist = BSP[6, bspIdx-nbp, k];
+            t_twist = BSP[k, bspIdx-nbp, 6];
             var res2 =
               basestepParameters(
                 O[1..3, i2], O[1..3, w2],
                 R[1..3, 1..3, i2], R[1..3, 1..3, w2], t_twist);
-            BSP[1..9, bspIdx, k] = res2;
-            E_E_dist[bspIdx, k] = absv(O[1..3, w2] - O[1..3, i2]);
-            C_length[bspIdx, k] = C_length[bspIdx-nbp, k] + C_length[nbp, k];
-            added_bsp[1..3, bspIdx, k] =
-              added_bsp[1..3, bspIdx-nbp, k] + BSP[1..3, nbp, k];
+            BSP[k, bspIdx, 1..9] = res2;
+            E_E_dist[k, bspIdx] = absv(O[1..3, w2] - O[1..3, i2]);
+            C_length[k, bspIdx] = C_length[k, bspIdx-nbp] + C_length[k, nbp];
+            added_bsp[k, bspIdx, 1..3] =
+              added_bsp[k, bspIdx-nbp, 1..3] + BSP[k, nbp, 1..3];
             for i3 in nbp-j+2..nbp {
               var w3 = i3+j-nbp;
               bspIdx += 1;
-              t_twist = BSP[6, bspIdx-nbp, k];
+              t_twist = BSP[k, bspIdx-nbp, 6];
               var res3 =
                 basestepParameters(
                   O[1..3, i3], O[1..3, w3],
                   R[1..3, 1..3, i3], R[1..3, 1..3, w3], t_twist);
-              BSP[1..9, bspIdx, k] = res3;
-              E_E_dist[bspIdx, k] = absv(O[1..3, w3] - O[1..3, i3]);
-              C_length[bspIdx, k] =
-                C_length[bspIdx-nbp, k] + C_length[w3-1, k];
-              added_bsp[1..3, bspIdx, k] =
-                added_bsp[1..3, bspIdx-nbp, k] + BSP[1..3, w3-1, k];
+              BSP[k, bspIdx, 1..9] = res3;
+              E_E_dist[k, bspIdx] = absv(O[1..3, w3] - O[1..3, i3]);
+              C_length[k, bspIdx] =
+                C_length[k, bspIdx-nbp] + C_length[k, w3-1];
+              added_bsp[k, bspIdx, 1..3] =
+                added_bsp[k, bspIdx-nbp, 1..3] + BSP[k, w3-1, 1..3];
             }
           }
         }
       }
 
       // Free coordinates memory as it is no longer needed
-      coordDom = {1..3, 1..0, 1..0};
+      coordDom = {1..0, 1..0, 1..3};
 
       if frames > 1 {
         writeln("Calculating elastic parameters");
@@ -419,10 +419,10 @@ module SerraNA {
           for l in 1..limit {
             var gIdx = idxL + l - 1;
             V[1..4, 1..4, gIdx] = deformationCovariance(
-                                BSP[5, gIdx, 1..frames],  // Roll
-                                BSP[4, gIdx, 1..frames],  // Tilt
-                                BSP[6, gIdx, 1..frames],  // Twist
-                                E_E_dist[gIdx, 1..frames] // Stretch
+                                BSP[1..frames, gIdx, 5],  // Roll
+                                BSP[1..frames, gIdx, 4],  // Tilt
+                                BSP[1..frames, gIdx, 6],  // Twist
+                                E_E_dist[1..frames, gIdx] // Stretch
                               );
             V__1[1..4, 1..4, gIdx] =
               inverseMatrixAnalytic4X4(V[1..4, 1..4, gIdx]);
@@ -446,7 +446,7 @@ module SerraNA {
       if cfgStrandsType == 2 {
         forall i in 1..nbp {
           for j in 1..6 {
-            var res = averageStd(BPP[j, i, 1..frames]);
+            var res = averageStd(BPP[1..frames, i, j]);
             avstd_BPP[1, j, i] = res[1];
             avstd_BPP[2, j, i] = res[2];
           }
@@ -455,28 +455,28 @@ module SerraNA {
 
       forall i in 1..n_bsp {
         for j in 1..9 {
-          var res = averageStd(BSP[j, i, 1..frames]);
+          var res = averageStd(BSP[1..frames, i, j]);
           avstd_BSP[1, j, i] = res[1];
           avstd_BSP[2, j, i] = res[2];
         }
-        var resE = averageStd(E_E_dist[i, 1..frames]);
+        var resE = averageStd(E_E_dist[1..frames, i]);
         avstd_E_E[1, i] = resE[1];
         avstd_E_E[2, i] = resE[2];
-        var resC = averageStd(C_length[i, 1..frames]);
+        var resC = averageStd(C_length[1..frames, i]);
         avstd_C_l[1, i] = resC[1];
         avstd_C_l[2, i] = resC[2];
         for j in 1..3 {
-          var resA = averageStd(added_bsp[j, i, 1..frames]);
+          var resA = averageStd(added_bsp[1..frames, i, j]);
           avstd_added[1, j, i] = resA[1];
           avstd_added[2, j, i] = resA[2];
         }
       }
 
       // Free large per-frame parameter arrays
-      BSPDomain = {1..9, 1..0, 1..0};
-      BPPDomain = {1..6, 1..0, 1..0};
+      BSPDomain = {1..0, 1..0, 1..9};
+      BPPDomain = {1..0, 1..0, 1..6};
       EE_CL_Domain = {1..0, 1..0};
-      addedBspDomain = {1..3, 1..0, 1..0};
+      addedBspDomain = {1..0, 1..0, 1..3};
 
       writeln("Calculating average structure parameters");
       var avstr_BSP: [1..9, 1..n_bsp] real;
@@ -639,77 +639,67 @@ module SerraNA {
       }
 
       writeln("Writing output files");
-      coforall task in 1..4 {
-        select task {
-          when 1 {
-            if cfgStrandsType == 2 {
-              writeBPP(
-                avstd_BPP, OV_BPP, seq, nbp, frames,
-                cfgStrandsType, cfgStructType==2
-              );
-            }
-          } 
-          when 2 {
-            writeBSP(avstd_BSP, OV_BSP, seq, nbp, frames, 
-                     cfgStrandsType, cfgStructType==2);
-          } 
-          when 3 {
-            // Build strucp [1..2, 1..11, 1..n_bsp]:
-            //   params 1..9  = averaged base-step parameters (Shift..Bending²)
-            //   param  10    = end-to-end distance
-            //   param  11    = contour length
-            var strucp: [1..2, 1..11, 1..n_bsp] real;
-            for i in 1..n_bsp {
-              for j in 1..9 {
-                strucp[1, j, i] = avstd_BSP[1, j, i];
-                strucp[2, j, i] = avstd_BSP[2, j, i];
-              }
-              strucp[1, 10, i] = avstd_E_E[1, i];
-              strucp[2, 10, i] = avstd_E_E[2, i];
-              strucp[1, 11, i] = avstd_C_l[1, i];
-              strucp[2, 11, i] = avstd_C_l[2, i];
-            }
-            var ovStrucp: [1..2, 1..11, 1..nbp-1] real;
-            for i in 1..nbp-1 {
-              for j in 1..9 {
-                ovStrucp[1, j, i] = OV_BSP[1, j, i];
-                ovStrucp[2, j, i] = OV_BSP[2, j, i];
-              }
-              ovStrucp[1, 10, i] = OV_E_E[1, i];
-              ovStrucp[2, 10, i] = OV_E_E[2, i];
-              ovStrucp[1, 11, i] = OV_C_l[1, i];
-              ovStrucp[2, 11, i] = OV_C_l[2, i];
-            }
-            // avstrp[1..3, 1..n_bsp]: Shift, Slide, Rise from the avg-struc BSP
-            // (rows 1-3 of avstr_BSP: Shift, Slide, Rise).
+      if cfgStrandsType == 2 {
+        writeBPP(
+          avstd_BPP, OV_BPP, seq, nbp, frames,
+          cfgStrandsType, cfgStructType==2
+        );
+      }
+      writeBSP(avstd_BSP, OV_BSP, seq, nbp, frames, 
+               cfgStrandsType, cfgStructType==2);
 
-            var avstrp: [1..3, 1..n_bsp] real = avstr_BSP[1..3, 1..n_bsp];
-
-            // ovAvstrp[1..2, 1..3, 1..nbp-1]: mean and std of avstrp over each
-            // separation length.
-            var ovAvstrp: [1..2, 1..3, 1..nbp-1] real;
-            for i in 1..3 do
-              for j in 1..nbp-1 do ovAvstrp[1, i, j] = OV_BSP_avstr[1, i, j];
-            writeStructural(
-              strucp, ovStrucp, avstrp,
-              ovAvstrp, seq, nbp, frames,
-              cfgStrandsType, cfgStructType==2
-            );
-          }
-          when 4 {
-            if frames > 1 {
-              var elasp: [1..13, 1..n_bsp] real;
-              for i in 1..n_bsp {
-                for j in 1..10 do elasp[j, i] = F[j, i];
-                elasp[11, i] = Ad2[i];
-              }
-              var ovElasp: [1..2, 1..13, 1..nbp-1] real;
-              writeElasticParms(
-                elasp, ovElasp, seq, nbp, frames,
-                cfgStrandsType, cfgStructType==2);
-            }
-          }
+      // Build strucp [1..2, 1..11, 1..n_bsp]:
+      //   params 1..9  = averaged base-step parameters (Shift..Bending²)
+      //   param  10    = end-to-end distance
+      //   param  11    = contour length
+      var strucp: [1..2, 1..11, 1..n_bsp] real;
+      for i in 1..n_bsp {
+        for j in 1..9 {
+          strucp[1, j, i] = avstd_BSP[1, j, i];
+          strucp[2, j, i] = avstd_BSP[2, j, i];
         }
+        strucp[1, 10, i] = avstd_E_E[1, i];
+        strucp[2, 10, i] = avstd_E_E[2, i];
+        strucp[1, 11, i] = avstd_C_l[1, i];
+        strucp[2, 11, i] = avstd_C_l[2, i];
+      }
+      var ovStrucp: [1..2, 1..11, 1..nbp-1] real;
+      for i in 1..nbp-1 {
+        for j in 1..9 {
+          ovStrucp[1, j, i] = OV_BSP[1, j, i];
+          ovStrucp[2, j, i] = OV_BSP[2, j, i];
+        }
+        ovStrucp[1, 10, i] = OV_E_E[1, i];
+        ovStrucp[2, 10, i] = OV_E_E[2, i];
+        ovStrucp[1, 11, i] = OV_C_l[1, i];
+        ovStrucp[2, 11, i] = OV_C_l[2, i];
+      }
+      // avstrp[1..3, 1..n_bsp]: Shift, Slide, Rise from the avg-struc BSP
+      // (rows 1-3 of avstr_BSP: Shift, Slide, Rise).
+
+      var avstrp: [1..3, 1..n_bsp] real = avstr_BSP[1..3, 1..n_bsp];
+
+      // ovAvstrp[1..2, 1..3, 1..nbp-1]: mean and std of avstrp over each
+      // separation length.
+      var ovAvstrp: [1..2, 1..3, 1..nbp-1] real;
+      for i in 1..3 do
+        for j in 1..nbp-1 do ovAvstrp[1, i, j] = OV_BSP_avstr[1, i, j];
+      writeStructural(
+        strucp, ovStrucp, avstrp,
+        ovAvstrp, seq, nbp, frames,
+        cfgStrandsType, cfgStructType==2
+      );
+
+      if frames > 1 {
+        var elasp: [1..13, 1..n_bsp] real;
+        for i in 1..n_bsp {
+          for j in 1..10 do elasp[j, i] = F[j, i];
+          elasp[11, i] = Ad2[i];
+        }
+        var ovElasp: [1..2, 1..13, 1..nbp-1] real;
+        writeElasticParms(
+          elasp, ovElasp, seq, nbp, frames,
+          cfgStrandsType, cfgStructType==2);
       }
     }
   }

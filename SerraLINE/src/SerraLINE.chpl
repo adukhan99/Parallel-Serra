@@ -304,7 +304,7 @@ module SerraLINE {
       var actualNbp = cfgNbpArg;
       var seqDom = {1..0};
       var finalSeq: [seqDom] string;
-      var coordDom = {1..3, 1..0, 1..0};
+      var coordDom = {1..0, 1..0, 1..3};
       var coords: [coordDom] real;
       var numFrames = 0;
   
@@ -373,7 +373,7 @@ module SerraLINE {
       // Each array gets its own named domain so it can be freed
       // independently, mirroring Fortran's per-variable deallocate().
       // ---------------------------------------------------------------
-      var gnDom = {1..3, 1..3, 1..numFrames};
+      var gnDom = {1..numFrames, 1..3, 1..3};
       var G_n: [gnDom] real;
       var bestDom = {1..numFrames};
       var best: [bestDom] int;
@@ -424,12 +424,12 @@ module SerraLINE {
       // ---------------------------------------------------------------
       writeln("Calculating tangent vectors");
       var tangentsN = if cfgIsCircular then actualNbp else nldim;
-      var tangentsDom = {1..3, 1..tangentsN, 1..numFrames};
+      var tangentsDom = {1..numFrames, 1..tangentsN, 1..3};
       var tangents: [tangentsDom] real;
       tangents = getTangentVectors(coords, cfgIsCircular, cfgTLength);
   
       // Fortran line 311-313: deallocate(coords) — no longer needed
-      coordDom = {1..3, 1..0, 1..0};
+      coordDom = {1..0, 1..0, 1..3};
   
       // ---------------------------------------------------------------
       // BENDINGS + RELATIVE SIZES + AVERAGES + WRITING

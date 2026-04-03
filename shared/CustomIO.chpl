@@ -189,65 +189,11 @@ module CustomIO {
                              seq: [] string) {
     try! {
       var f = open(trajPath, ioMode.r);
-      var reader = f.reader();
-      
+      var reader = f.reader(locking=false);
       var header: string;
       reader.readLine(header);
 
-      var framesList: list([1..3, 1..nAtoms] real);
-      
-      const totalCoords = 3 * nAtoms;
-      const coordsPerLine = 10;
-      const linesPerFrame = ceil(totalCoords:real / coordsPerLine):int;
-
-      try {
-        while true {
-          var frame: [1..3, 1..nAtoms] real;
-          var flatCoords: [1..totalCoords] real;
-          var cCount = 0;
-          
-          for l in 1..linesPerFrame {
-            var line: string;
-            if !reader.readLine(line) then break;
-            
-            // Each line has up to 10 floats in F8.3 format
-            for i in 0..9 {
-              var start = i * 8;
-              if start + 8 > line.numBytes then break;
-              var s = line[start..start+7].strip();
-              if s == "" then continue;
-              cCount += 1;
-              if cCount <= totalCoords then flatCoords[cCount] = s:real;
-            }
-          }
-          
-          if cCount < totalCoords then break;
-
-          // Reshape flat coordinates into frame array
-          for i in 1..nAtoms {
-            for j in 1..3 do frame[j, i] = flatCoords[(i-1)*3 + j];
-          }
-
-          // Skip box line if present according to topology
-          if boxPresent != 0 {
-            var dummy: string;
-            reader.readLine(dummy);
-          }
-          
-          framesList.pushBack(frame);
-        }
-      } catch {
-        // End of file or read error
-      }
-      f.close();
-
-      var numFrames = framesList.size;
-
-      // Filter coordinates to ring atoms and handle open structure ends
-      var startBp = 1,
-          endBp = nbp,
-          actualNbp = nbp;
-
+      var startBp = 1, endBp = nbp, actualNbp = nbp;
       if !isCircular {
         actualNbp = nbp - 4;
         startBp = 3;
@@ -259,7 +205,6 @@ module CustomIO {
         if seq[i] == "A" || seq[i] == "G" then rAtomsPerStrand += 9;
         else rAtomsPerStrand += 6;
       }
-
       var totalRAtoms = rAtomsPerStrand;
       if strandsType == 2 {
         for i in startBp..endBp {
@@ -267,111 +212,150 @@ module CustomIO {
           else totalRAtoms += 6;
         }
       }
-      var filteredCoords: [1..3, 1..totalRAtoms, 1..numFrames] real;
-      var framesArr = framesList.toArray();
 
-      forall k in 1..numFrames {
-        var l = 0;
-        // Strand 1
-        var ringPtr = 1;
-        // Skip first 2 bp if linear
+      var atomToL: [1..nAtoms] int;
+      var l = 0;
+      var ringPtr = 1;
+      if !isCircular {
+        for i in 1..2 do ringPtr +=
+          if seq[i] == "A" || seq[i] == "G" then 9 else 6;
+      }
+      for i in startBp..endBp {
+        var a = if seq[i] == "A" || seq[i] == "G" then 9 else 6;
+        for 1..a { 
+          l += 1;
+          atomToL[ringIndices[ringPtr]] = l; 
+          ringPtr += 1; 
+        }
+      }
+      if strandsType == 2 {
+        var ringPtr2 = 1;
+        for i in 1..nbp do ringPtr2 +=
+          if seq[i] == "A" || seq[i] == "G" then 9 else 6;
         if !isCircular {
-          for i in 1..2 {
-            if seq[i] == "A" || seq[i] == "G" then ringPtr += 9;
-            else ringPtr += 6;
-          }
+          for i in 1..2 do ringPtr2 +=
+            if seq[nbp+i] == "A" || seq[nbp+i] == "G" then 9 else 6;
         }
-        
         for i in startBp..endBp {
-          var atomsInBase = if seq[i] == "A" || seq[i] == "G" then 9 else 6;
-          for 1..atomsInBase {
-            l += 1;
-            var atomIdx = ringIndices[ringPtr];
-            filteredCoords[1..3, l, k] = framesArr[k-1][1..3, atomIdx];
-            ringPtr += 1;
+          var a = if seq[nbp+i] == "A" || seq[nbp+i] == "G" then 9 else 6;
+          for 1..a { 
+            l += 1; 
+            atomToL[ringIndices[ringPtr2]] = l; 
+            ringPtr2 += 1; 
           }
         }
+      }
 
-        // Strand 2
-        if strandsType == 2 {
-          // Re-calculate ringPtr for second strand
-          var ringPtr2 = 1;
-          for i in 1..nbp {
-             if seq[i] == "A" || seq[i] == "G" then ringPtr2 += 9;
-             else ringPtr2 += 6;
-          }
-          // Now at start of strand 2
-          if !isCircular {
-             for i in 1..2 {
-               if seq[nbp+i] == "A" || seq[nbp+i] == "G" then ringPtr2 += 9;
-               else ringPtr2 += 6;
-             }
-          }
-          for i in startBp..endBp {
-            var idxInSeq = nbp + i;
-            var isPurine = seq[idxInSeq] == "A" || seq[idxInSeq] == "G";
-            var atomsInBase = if isPurine then 9 else 6;
-            for 1..atomsInBase {
-              l += 1;
-              var atomIdx = ringIndices[ringPtr2];
-              filteredCoords[1..3, l, k] = framesArr[k-1][1..3, atomIdx];
-              ringPtr2 += 1;
+      var numFrames = 0;
+      var D = {1..1000, 1..totalRAtoms, 1..3};
+      var filteredCoords: [D] real;
+      var totalCoords = 3 * nAtoms;
+
+      while true {
+        var flatCoords: [1..totalCoords] real;
+        var cCount = 0;
+        for line in reader.lines(stripNewline=true) {
+          var nBytes = line.numBytes;
+          var nToks = nBytes / 8;
+          for i in 0..nToks-1 {
+            var tok = line[i*8..i*8+7];
+            var isBlank = true;
+            for b in tok.bytes() do if b != 32 { 
+              isBlank = false; 
+              break; 
+            }
+            if !isBlank {
+              cCount += 1;
+              if cCount <= totalCoords then flatCoords[cCount] = tok:real;
             }
           }
+          if cCount >= totalCoords then break;
         }
-      }
+        if cCount < totalCoords then break;
 
+        numFrames += 1;
+        if numFrames > D.high(1) {
+          D = {1..D.high(1)*2, 1..totalRAtoms, 1..3};
+        }
+
+        for i in 1..nAtoms {
+          var rl = atomToL[i];
+          if rl > 0 {
+            filteredCoords[numFrames, rl, 1] = flatCoords[(i-1)*3 + 1];
+            filteredCoords[numFrames, rl, 2] = flatCoords[(i-1)*3 + 2];
+            filteredCoords[numFrames, rl, 3] = flatCoords[(i-1)*3 + 3];
+          }
+        }
+        if boxPresent != 0 { var dummy: string; reader.readLine(dummy); }
+      }
+      f.close();
+      
+      D = {1..numFrames, 1..totalRAtoms, 1..3}; // truncate
+      
       var finalSeq: list(string);
       for i in startBp..endBp do finalSeq.pushBack(seq[i]);
-      if strandsType == 2 {
+      if strandsType == 2 then 
         for i in startBp..endBp do finalSeq.pushBack(seq[nbp + i]);
-      }
       var retSeq: [1..finalSeq.size] string;
       for i in 1..finalSeq.size do retSeq[i] = finalSeq[i-1];
-
       return (filteredCoords, numFrames, actualNbp, retSeq);
     }
   }
 
   proc coordinatesOther(path: string, nAtoms: int) {
     try! {
-      // First pass: count frames
-      var f1 = open(path, ioMode.r);
-      var r1 = f1.reader();
-      var isXyz = path.endsWith(".xyz");
       var numFrames = 0;
-      try {
-        while true {
-          if isXyz {
-            var n: int;
-            if !r1.read(n) then break;
-            r1.readLine(); // skip comment
-          }
-          for 1..nAtoms {
-            if isXyz then r1.read(string); // atom name
-            for 1..3 do r1.read(real);
-          }
-          numFrames += 1;
-        }
-      } catch { }
-      f1.close();
+      var D = {1..1000, 1..nAtoms, 1..3};
+      var coords: [D] real;
 
-      // Second pass: read directly into array
-      var coords: [1..3, 1..nAtoms, 1..numFrames] real;
       var f2 = open(path, ioMode.r);
-      var r2 = f2.reader();
-      for k in 1..numFrames {
+      var r2 = f2.reader(locking=false);
+      var isXyz = path.endsWith(".xyz");
+
+      while true {
         if isXyz {
-          r2.read(int);
-          r2.readLine();
+          var nv: int;
+          if !r2.read(nv) then break;
+          var dummy: string;
+          r2.readLine(dummy);
         }
+        numFrames += 1;
+        if numFrames > D.high(1) {
+          D = {1..D.high(1)*2, 1..nAtoms, 1..3};
+        }
+        var validFrame = true;
         for i in 1..nAtoms {
-          if isXyz then r2.read(string);
-          for j in 1..3 do coords[j, i, k] = r2.read(real);
+          if isXyz { 
+            var n: string; 
+            if !r2.read(n) { 
+              validFrame = false; 
+              break; 
+            } 
+          }
+          var c1, c2, c3: real;
+          if !r2.read(c1) { 
+            validFrame = false; 
+            break; 
+          }
+          if !r2.read(c2) { 
+            validFrame = false; 
+            break; 
+          }
+          if !r2.read(c3) { 
+            validFrame = false; 
+            break; 
+          }
+          coords[numFrames, i, 1] = c1;
+          coords[numFrames, i, 2] = c2;
+          coords[numFrames, i, 3] = c3;
+        }
+        if !validFrame { 
+          numFrames -= 1; 
+          break; 
         }
       }
       f2.close();
-
+      D = {1..numFrames, 1..nAtoms, 1..3};
       return (coords, numFrames);
     }
   }
@@ -714,7 +698,9 @@ module CustomIO {
           l += 1;
           var s2_1 = if strandsType == 2 then seq[2*nbp-w+1] else "#";
           var s2_2 = if strandsType == 2 then seq[2*nbp-i+1] else "#";
-          writer.writef("%4i", i); writer.write("-"); writer.writef("%4i", w);
+          writer.writef("%4i", i);
+          writer.write("-");
+          writer.writef("%4i", w);
           writer.write(" ", seq[i], seq[w], "/", s2_1, s2_2);
           for p in 1..7 {
               writer.writef("%10.3r%10.3r", BSP[1, p, l], BSP[2, p, l]);
@@ -768,7 +754,9 @@ module CustomIO {
           l += 1;
           var s2_1 = if strandsType == 2 then seq[2*nbp-w+1] else "#";
           var s2_2 = if strandsType == 2 then seq[2*nbp-i+1] else "#";
-          writer.writef("%4i", i); writer.write("-"); writer.writef("%4i", w);
+          writer.writef("%4i", i);
+          writer.write("-");
+          writer.writef("%4i", w);
           writer.write(" ", seq[i], seq[w], "/", s2_1, s2_2);
           for p in 1..11 {
               writer.writef("%10.3r%10.3r", strucp[1, p, l], strucp[2, p, l]);
@@ -829,7 +817,9 @@ module CustomIO {
         l += 1;
         var s2_1 = if strandsType == 2 then seq[2*nbp-w+1] else "#";
         var s2_2 = if strandsType == 2 then seq[2*nbp-i+1] else "#";
-        writer.writef("%4i", i); writer.write("-"); writer.writef("%4i", w);
+        writer.writef("%4i", i);
+        writer.write("-");
+        writer.writef("%4i", w);
         writer.write(" ", seq[i], seq[w], "/", s2_1, s2_2);
         for p in 1..13 {
             writer.writef("%20.3r", elasp[p, l]);

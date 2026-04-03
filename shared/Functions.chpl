@@ -89,13 +89,10 @@ module Functions {
 
     // Get Average
     res[1] = + reduce(X) / n:real;
+    var a = res[1];
 
     // Now Standard deviation
-    var s = 0.0;
-    for x in X {
-      var a = x - res[1];
-      s += a * a;
-    }
+    var s = + reduce ((X - a) ** 2);
     res[2] = sqrt(s / n:real);
 
     return res;
@@ -191,17 +188,12 @@ module Functions {
       G[j,i] = -si;
 
       V = dot(V, G);
+      // S = G^T * S * G (optimized manually in 4x4, here using dot)
       upS = dot(transpose(G), S);
       upS = dot(upS, G);
       S = upS;
 
-      cond = 0.0;
-      for k in 1..ndim-1 {
-        for l in k+1..ndim {
-          cond += abs(S[k,l]);
-        }
-      }
-      cond *= 2.0;
+      if larg < eps then break;
     }
 
     return (S, V);
@@ -475,13 +467,7 @@ module Functions {
       newS(j)(i) = 0.0;
       S = newS;
 
-      cond = 0.0;
-      for k in 0..2 {
-        for l in k+1..3 {
-          cond += abs(S(k)(l));
-        }
-      }
-      cond *= 2.0;
+      if larg < eps then break;
     }
 
     return (S, V);
@@ -970,7 +956,7 @@ module Functions {
           bpFitting: [] int) {
     var nbp = coords.dim(1).size;
     var numFrames = coords.dim(2).size;
-    var G_n: [1..3, 1..3, 1..numFrames] real;
+    var G_n: [1..numFrames, 1..3, 1..3] real;
     var best: [1..numFrames] int;
     var avgDistFrame: [1..numFrames] real;
     var maxDistFrame: [1..numFrames] real;
@@ -982,7 +968,7 @@ module Functions {
       if bpFitting.size > 0 {
         for i in 1..nFitting do c += coords[1..3, bpFitting[i], k];
         c /= nFitting:real;
-        for i in 1..nbp do A[1..3, i] = coords[1..3, i, k] - c;
+        for i in 1..nbp do A[1..3, i] = coords[k, i, 1..3] - c;
         
         var A_fit: [1..3, 1..nFitting] real;
         for i in 1..nFitting do A_fit[1..3, i] = A[1..3, bpFitting[i]];
@@ -995,17 +981,17 @@ module Functions {
         var distToPlane: [1..nbp] real;
         for i in 1..nbp {
           var A_p = projvU(A[1..3, i], U[1..3, best[k]]);
-          coords[1..3, i, k] = A[1..3, i] - A_p;
+          coords[k, i, 1..3] = A[1..3, i] - A_p;
           distToPlane[i] = absv(A_p);
           avgDistFrame[k] += distToPlane[i];
         }
         avgDistFrame[k] /= nbp:real;
         maxDistFrame[k] = max reduce distToPlane;
-        G_n[1..3, 1..3, k] = U;
+        G_n[k, 1..3, 1..3] = U;
       } else {
-        for i in 1..nbp do c += coords[1..3, i, k];
+        for i in 1..nbp do c += coords[k, i, 1..3];
         c /= nbp:real;
-        for i in 1..nbp do A[1..3, i] = coords[1..3, i, k] - c;
+        for i in 1..nbp do A[1..3, i] = coords[k, i, 1..3] - c;
         
         var (S, U) = diagonalizationJacobi(dot(A, transpose(A)));
         var d: [1..3] real = [S[1,1], S[2,2], S[3,3]];
@@ -1015,13 +1001,13 @@ module Functions {
         var distToPlane: [1..nbp] real;
         for i in 1..nbp {
           var A_p = projvU(A[1..3, i], U[1..3, best[k]]);
-          coords[1..3, i, k] = A[1..3, i] - A_p;
+          coords[k, i, 1..3] = A[1..3, i] - A_p;
           distToPlane[i] = absv(A_p);
           avgDistFrame[k] += distToPlane[i];
         }
         avgDistFrame[k] /= nbp:real;
         maxDistFrame[k] = max reduce distToPlane;
-        G_n[1..3, 1..3, k] = U;
+        G_n[k, 1..3, 1..3] = U;
       }
     }
     return (G_n, best, avgDistFrame, maxDistFrame);
@@ -1034,18 +1020,18 @@ module Functions {
     var nbp = coords.dim(1).size;
     var numFrames = coords.dim(2).size;
     var tangents_n = if circleStr then nbp else nbp - tLength;
-    var tangents: [1..3, 1..tangents_n, 1..numFrames] real;
+    var tangents: [1..numFrames, 1..tangents_n, 1..3] real;
     forall k in 1..numFrames {
       for i in 1..nbp-tLength {
-        tangents[1..3, i, k] = 
-          normalizeVector(coords[1..3, i+tLength, k] - coords[1..3, i, k]);
+        tangents[k, i, 1..3] = 
+          normalizeVector(coords[k, i+tLength, 1..3] - coords[k, i, 1..3]);
       }
       if circleStr {
         var j = 0;
         for i in nbp-tLength+1..nbp {
           j += 1;
-          tangents[1..3, i, k] = 
-            normalizeVector(coords[1..3, j, k] - coords[1..3, i, k]);
+          tangents[k, i, 1..3] = 
+            normalizeVector(coords[k, j, 1..3] - coords[k, i, 1..3]);
         }
       }
     }
@@ -1159,7 +1145,7 @@ module Functions {
       for l in 1..ndim-1 {
         for i in 1..ndim-l {
           var j = i + l;
-          var r = coords[1..3, j, k] - coords[1..3, i, k];
+          var r = coords[k, j, 1..3] - coords[k, i, 1..3];
           var d = absv2(r);
           if d > dOp {
             dOp = d;
@@ -1180,7 +1166,7 @@ module Functions {
         for i in 1..ndim-l {
           s += 1;
           var j = i + l;
-          var rVec = coords[1..3, j, k] - coords[1..3, i, k];
+          var rVec = coords[k, j, 1..3] - coords[k, i, 1..3];
           var xy1 = projvU(rVec, G_k[1..3, 1]);
           var xy2 = projvU(rVec, G_k[1..3, 2]);
           ahe[s] = absv(xy1);
@@ -1214,7 +1200,7 @@ module Functions {
         for i in 1..ndim {
           var s = i + l;
           var j = if s > ndim then s - ndim else s;
-          var r = coords[1..3, j, k] - coords[1..3, i, k];
+          var r = coords[k, j, 1..3] - coords[k, i, 1..3];
           var d = absv2(r);
           if d > dOp {
             dOp = d;
@@ -1234,7 +1220,7 @@ module Functions {
         for i in 1..ndim {
           var sIdx = i + l;
           var j = if sIdx > ndim then sIdx - ndim else sIdx;
-          var rVec = coords[1..3, j, k] - coords[1..3, i, k];
+          var rVec = coords[k, j, 1..3] - coords[k, i, 1..3];
           var xy1 = projvU(rVec, G_k[1..3, 1]);
           var xy2 = projvU(rVec, G_k[1..3, 2]);
           ahe[i,l] = absv(xy1);
@@ -1264,8 +1250,8 @@ module Functions {
       for i in 1..ndim-jVal {
         l += 1;
         var c = 
-          crossProduct3(tangents[1..3, i, k], tangents[1..3, i+jVal, k]);
-        var d = dot(tangents[1..3, i, k], tangents[1..3, i+jVal, k]);
+          crossProduct3(tangents[k, i, 1..3], tangents[k, i+jVal, 1..3]);
+        var d = dot(tangents[k, i, 1..3], tangents[k, i+jVal, 1..3]);
         var b: real;
         if d > 1.0 then b = 0.0;
         else if d < -1.0 then b = pi;
@@ -1298,7 +1284,7 @@ module Functions {
       for j in 1..ndim-1 {
         for i in 1..ndim-j {
           l += 1;
-          var a = dot(tangents[1..3, i, k], tangents[1..3, i+j, k]);
+          var a = dot(tangents[k, i, 1..3], tangents[k, i+j, 1..3]);
           var b = acos(clamp(a, -1.0, 1.0));
           bends[k,l] = rad_to_deg * b;
         }
@@ -1320,8 +1306,8 @@ module Functions {
       var l = 1;
       for i in 1..ndim-l {
         var j = i + l;
-        var c = crossProduct3(tangents[1..3, i, k], tangents[1..3, j, k]);
-        var d = dot(tangents[1..3, i, k], tangents[1..3, j, k]);
+        var c = crossProduct3(tangents[k, i, 1..3], tangents[k, j, 1..3]);
+        var d = dot(tangents[k, i, 1..3], tangents[k, j, 1..3]);
         var b: real;
         if d > 1.0 then b = 0.0;
         else if d < -1.0 then b = pi;
@@ -1332,8 +1318,8 @@ module Functions {
       }
       for i in ndim-l+1..ndim {
         var j = i + l - ndim;
-        var c = crossProduct3(tangents[1..3, i, k], tangents[1..3, j, k]);
-        var d = dot(tangents[1..3, i, k], tangents[1..3, j, k]);
+        var c = crossProduct3(tangents[k, i, 1..3], tangents[k, j, 1..3]);
+        var d = dot(tangents[k, i, 1..3], tangents[k, j, 1..3]);
         var b: real;
         if d > 1.0 then b = 0.0;
         else if d < -1.0 then b = pi;
@@ -1369,11 +1355,11 @@ module Functions {
     forall k in 1..numFrames {
       for l in 1..ndim-1 {
         for i in 1..ndim-l {
-          var a = dot(tangents[1..3, i, k], tangents[1..3, i+l, k]);
+          var a = dot(tangents[k, i, 1..3], tangents[k, i+l, 1..3]);
           bends[k,i,l] = rad_to_deg * acos(clamp(a, -1.0, 1.0));
         }
         for i in ndim-l+1..ndim {
-          var a = dot(tangents[1..3, i, k], tangents[1..3, i+l-ndim, k]);
+          var a = dot(tangents[k, i, 1..3], tangents[k, i+l-ndim, 1..3]);
           bends[k,i,l] = rad_to_deg * acos(clamp(a, -1.0, 1.0));
         }
       }
@@ -1402,7 +1388,7 @@ module Functions {
           var d = normalizeVector(crossProduct3(b, e3_arr));
           var Rot = generalRotationMatrix(d, angle);
           for i in 1..nbp {
-            var pos = dot(Rot, coords[1..3, i, k]);
+            var pos = dot(Rot, coords[k, i, 1..3]);
             writer.writeln(seq[i], " ", pos[1], " ", pos[2], " ", pos[3]);
           }        }
         writer.close();
@@ -1417,11 +1403,11 @@ module Functions {
           var angle = acos(clamp(dot(b, e3_arr), -1.0, 1.0));
           var d = normalizeVector(crossProduct3(b, e3_arr));
           var Rot = generalRotationMatrix(d, angle);
-          var rotatedCoords = dot(Rot, coords[1..3, 1..nbp, k]);
+          var rotatedCoords = dot(Rot, coords[k, 1..nbp, 1..3]);
           
           var count = 0;
           for i in 1..nbp {
-             var pos = dot(Rot, coords[1..3, i, k]);
+             var pos = dot(Rot, coords[k, i, 1..3]);
              for j in 1..3 {
                writer.write(pos[j], " ");
                count += 1;

@@ -197,7 +197,10 @@ module WrLINE {
             var token = line[i * 8..#8];
             var isBlank = true;
             for b in token.bytes() do
-              if b != 32 { isBlank = false; break; }
+              if b != 32 {
+                isBlank = false;
+                break;
+              }
             if !isBlank {
               coords[idx] = token: real;
               idx += 1;
@@ -520,11 +523,17 @@ module WrLINE {
     // Removed nested forall loop and local array 'y' allocations
     for j in 1..loopLimit {
       var next_j = if isCircular && j == l then 1 else j + 1;
-      var tj = mkVec(X[t, next_j, 1] - X[t, j, 1], X[t, next_j, 2] - X[t, j, 2], X[t, next_j, 3] - X[t, j, 3]);
+      var tj = mkVec(X[t, next_j, 1] - X[t, j, 1],
+                     X[t, next_j, 2] - X[t, j, 2],
+                     X[t, next_j, 3] - X[t, j, 3]);
       for k in 1..j - 1 {
         var next_k = k + 1;
-        var tk = mkVec(X[t, next_k, 1] - X[t, k, 1], X[t, next_k, 2] - X[t, k, 2], X[t, next_k, 3] - X[t, k, 3]);
-        var rjk = mkVec(X[t, j, 1] - X[t, k, 1], X[t, j, 2] - X[t, k, 2], X[t, j, 3] - X[t, k, 3]);
+        var tk = mkVec(X[t, next_k, 1] - X[t, k, 1],
+                       X[t, next_k, 2] - X[t, k, 2],
+                       X[t, next_k, 3] - X[t, k, 3]);
+        var rjk = mkVec(X[t, j, 1] - X[t, k, 1],
+                       X[t, j, 2] - X[t, k, 2],
+                       X[t, j, 3] - X[t, k, 3]);
         var crossJK = vecCross(tj, tk);
         var dotVal = vecDot(rjk, crossJK);
         var dist = vecNorm(rjk);
@@ -536,7 +545,8 @@ module WrLINE {
     return Wr;
   }
 
-  proc calcWrithe(inName: string, inNbp: int, inNstep: int, ref X: [1..inNstep, 1..inNbp, 1..3] real) {
+  proc calcWrithe(inName: string, inNbp: int,
+                  inNstep: int, ref X: [1..inNstep, 1..inNbp, 1..3] real) {
     var writheArr: [1..inNstep, 1..2] real;
     forall t in 1..inNstep {
       writheArr[t, 1] = t: real;
